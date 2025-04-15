@@ -1046,7 +1046,7 @@ class AutoencoderExcitedMACE(torch.nn.Module):
         }
 
 @compile_mode("script")
-class EmbeddingXMACE(torch.nn.Module):
+class EmbeddingEMACE(torch.nn.Module):
     def __init__(
         self,
         r_max: float,
@@ -1062,6 +1062,7 @@ class EmbeddingXMACE(torch.nn.Module):
         n_nacs: int,
         n_socs: int,
         n_dipoles: int,
+        n_oscillators: int,
         hidden_irreps: o3.Irreps,
         MLP_irreps: o3.Irreps,
         atomic_energies: np.ndarray,
@@ -1089,6 +1090,8 @@ class EmbeddingXMACE(torch.nn.Module):
         self.n_nacs = n_nacs
         self.n_socs = n_socs
         self.n_dipoles = n_dipoles
+        self.n_oscillators = n_oscillators
+        self.total_o0 = self.n_energies + self.n_oscillators
         self.total_o1 = self.n_nacs + self.n_socs + self.n_dipoles
         self.num_permutational_invariant = num_permutational_invariant
 
@@ -1111,9 +1114,6 @@ class EmbeddingXMACE(torch.nn.Module):
             radial_type=radial_type,
             distance_transform=distance_transform,
         )
-
-        self.perm_encoder = PermutationInvariantEncoder(latent_dim=num_permutational_invariant)
-        self.perm_decoder = PermutationInvariantDecoder(latent_dim=num_permutational_invariant, n_energies=n_energies)
 
         edge_feats_irreps = o3.Irreps(f"{self.radial_embedding.out_dim}x0e")
         if pair_repulsion:
@@ -1160,12 +1160,9 @@ class EmbeddingXMACE(torch.nn.Module):
 
         self.readouts = torch.nn.ModuleList()
         if self.total_o1 > 1:
-            self.readouts.append(LinearDipoleReadoutBlock(hidden_irreps, n_energies, self.total_o1))
+            self.readouts.append(LinearDipoleReadoutBlock(hidden_irreps, self.total_o0, self.total_o1))
         else:
-            self.readouts.append(LinearReadoutBlock(hidden_irreps, n_energies))
-
-        self.invariant_readouts = torch.nn.ModuleList()
-        self.invariant_readouts.append(LinearReadoutBlock(hidden_irreps, num_permutational_invariant))
+            self.readouts.append(LinearReadoutBlock(hidden_irreps, self.total_o0))
 
         for i in range(num_interactions - 1):
             if i == num_interactions - 2:
@@ -1195,16 +1192,14 @@ class EmbeddingXMACE(torch.nn.Module):
             self.products.append(prod)
             if i == num_interactions - 2:
                 if self.total_o1 > 0:
-                    self.readouts.append(NonLinearDipoleReadoutBlock(hidden_irreps_out, MLP_irreps, gate, n_energies, self.total_o1))
+                    self.readouts.append(NonLinearDipoleReadoutBlock(hidden_irreps_out, MLP_irreps, gate, self.total_o0, self.total_o1))
                 else:
-                    self.readouts.append(NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, gate, n_energies))
+                    self.readouts.append(NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, gate, self.total_o0))
             else:
                 if self.total_o1 > 0:
-                    self.readouts.append(LinearDipoleReadoutBlock(hidden_irreps, n_energies, self.total_o1))
+                    self.readouts.append(LinearDipoleReadoutBlock(hidden_irreps, self.total_o0, self.total_o1))
                 else:
-                    self.readouts.append(LinearReadoutBlock(hidden_irreps, n_energies))
-
-            self.invariant_readouts.append(NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, gate, num_permutational_invariant))
+                    self.readouts.append(LinearReadoutBlock(hidden_irreps, self.total_o0))
 
     def forward(
         self,
@@ -1232,8 +1227,10 @@ class EmbeddingXMACE(torch.nn.Module):
         )  # [n_graphs,]
         # Embeddings
         node_feats = self.node_embedding(data["node_attrs"])
-        scalar_feats = self.scalar_embedding(data["scalar_params"])
-        node_feats = node_feats + scalar_feats
+
+        if "scalar_params" in data.keys():
+            scalar_feats = self.scalar_embedding(data["scalar_params"])
+            node_feats = node_feats + scalar_feats
 
         vectors, lengths = get_edge_vectors_and_lengths(
             positions=data["positions"],
@@ -1247,7 +1244,6 @@ class EmbeddingXMACE(torch.nn.Module):
         pair_node_energy = torch.zeros_like(node_e0)
         pair_energy = torch.zeros_like(e0)
 
-        # Interactions
         energies = [e0.unsqueeze(-1).expand(-1, self.n_energies), pair_energy.unsqueeze(-1).expand(-1, self.n_energies)]
         node_energies_list = [node_e0.unsqueeze(-1).expand(-1, self.n_energies), pair_node_energy.unsqueeze(-1).expand(-1, self.n_energies)]
         node_feats_list = []
@@ -1257,10 +1253,10 @@ class EmbeddingXMACE(torch.nn.Module):
         dipoles_contributions = []
         nacs_contributions = []
         socs_contributions = []
-        invariant_contributions = []
+        oscillator_contributions = []
 
-        for interaction, product, readout, invariant_readout in zip(
-            self.interactions, self.products, self.readouts, self.invariant_readouts
+        for interaction, product, readout in zip(
+            self.interactions, self.products, self.readouts
         ):
             node_feats, sc = interaction(
                 node_attrs=data["node_attrs"],
@@ -1277,14 +1273,13 @@ class EmbeddingXMACE(torch.nn.Module):
             )
             node_feats_list.append(node_feats)
             node_output = readout(node_feats).squeeze(-1)
-            node_invariant_output = invariant_readout(node_feats).squeeze(-1)
             node_energies = torch.transpose(node_output[:, :self.n_energies], 0, 1)
-            node_invariant_output = torch.transpose(node_invariant_output, 0, 1)
+            node_oscillators = torch.transpose(node_output[:, self.n_energies: self.n_energies + self.n_oscillators], 0, 1)
 
-            node_nacs = node_output[-self.n_dipoles -self.n_socs -self.n_nacs: -self.n_dipoles -self.n_socs] if self.n_nacs else node_output[:0]
-            node_dipoles = node_output[-self.n_dipoles -self.n_socs: -self.n_socs] if self.n_dipoles else node_output[:0]
-            node_socs = node_output[-self.n_socs:] if self.n_socs else node_output[:0]
-
+            node_vector_output = node_output[:, self.n_energies + self.n_oscillators:]
+            node_nacs = node_vector_output[:, :self.n_nacs*3] if self.n_nacs else node_vector_output[:0]
+            node_dipoles = node_vector_output[:, self.n_nacs*3: (self.n_nacs+self.n_dipoles)*3] if self.n_dipoles else node_vector_output[:0]
+            node_socs = node_vector_output[:, (self.n_nacs+self.n_dipoles)*3:] if self.n_socs else node_vector_output[:0]
             node_nacs_list.append(node_nacs.reshape(node_nacs.shape[0], self.n_nacs, 3))
             node_dipoles_list.append(node_dipoles.reshape(node_dipoles.shape[0], self.n_dipoles, 3))
             node_soc_list.append(node_socs.reshape(node_socs.shape[0], self.n_socs, 3))
@@ -1292,50 +1287,92 @@ class EmbeddingXMACE(torch.nn.Module):
                 src=node_energies, index=data["batch"], dim=-1, dim_size=num_graphs
             )  # [n_graphs,]
 
-            invariant_energy = scatter_sum(
-                src=node_invariant_output, index=data["batch"], dim=-1, dim_size=num_graphs
-            )  # [n_graphs,]
+            if node_oscillators.numel() == 0:
+                oscillators = None
+            else:
+                oscillators = scatter_sum(
+                    src=node_oscillators,
+                    index=data["batch"],
+                    dim=-1,
+                    dim_size=num_graphs
+                )
+                oscillators = torch.transpose(oscillators, 0, 1)
 
-            dipoles = scatter_sum(
-                src=torch.transpose(node_dipoles, 0, 1), index=data["batch"], dim=-1, dim_size=num_graphs
-            )  # [n_graphs,]
+            if node_dipoles.numel() == 0:
+                dipoles = None
+            else:
+                dipoles = scatter_sum(
+                    src=torch.transpose(node_dipoles, 0, 1),
+                    index=data["batch"],
+                    dim=-1,
+                    dim_size=num_graphs
+                )
+                dipoles = torch.transpose(dipoles, 0, 1)
+                dipoles = dipoles.reshape(dipoles.shape[0], self.n_dipoles, 3)
 
-            nacs = scatter_sum(
-                src=torch.transpose(node_nacs, 0, 1), index=data["batch"], dim=-1, dim_size=num_graphs
-            )  # [n_graphs,]
+            if node_nacs.numel() == 0:
+                nacs = None
+            else:
+                nacs = scatter_sum(
+                    src=torch.transpose(node_nacs, 0, 1),
+                    index=data["batch"],
+                    dim=-1,
+                    dim_size=num_graphs
+                )
+                nacs = torch.transpose(nacs, 0, 1)
+                nacs = nacs.reshape(nacs.shape[0], self.n_nacs, 3)
 
-            socs = scatter_sum(
-                src=torch.transpose(node_socs, 0, 1), index=data["batch"], dim=-1, dim_size=num_graphs
-            )  # [n_graphs,]
+            if node_socs.numel() == 0:
+                socs = None
+            else:
+                socs = scatter_sum(
+                    src=torch.transpose(node_socs, 0, 1),
+                    index=data["batch"],
+                    dim=-1,
+                    dim_size=num_graphs
+                )
+                socs = torch.transpose(socs, 0, 1)
+                socs = socs.reshape(socs.shape[0], self.n_socs, 3)
 
-            dipoles_contributions.append(torch.transpose(dipoles, 0, 1))
-            socs_contributions.append(torch.transpose(socs, 0, 1))
-            nacs_contributions.append(torch.transpose(nacs, 0, 1))
+            dipoles_contributions.append(dipoles)
+            socs_contributions.append(socs)
+            nacs_contributions.append(nacs)
+            oscillator_contributions.append(oscillators)
             energies.append(torch.transpose(energy, 0, 1))
             node_energies_list.append(torch.transpose(node_energies, 0, 1))
-            invariant_contributions.append(invariant_energy)
 
         # Concatenate node features
         node_feats_out = torch.cat(node_feats_list, dim=-1)
 
-        invariant_contributions = torch.stack(invariant_contributions, dim=1)
-        invariant_vals = torch.sum(invariant_contributions, dim=1)  # [n_graphs, ]
-        invariant_vals = torch.transpose(invariant_vals, 0, 1)
-        decoded_vals = self.perm_decoder(invariant_vals) + e0.unsqueeze(-1).expand(-1, self.n_energies) + pair_energy.unsqueeze(-1).expand(-1, self.n_energies)
+        energies = torch.stack(energies, dim=1)
+        energies = torch.sum(energies, dim=1)  # [n_graphs, ]
 
-        dipole_contributions = torch.stack(dipoles_contributions, dim=1)
-        total_dipoles = torch.sum(dipole_contributions, dim=1)  # [n_graphs, ]
-        #total_dipoles = total_dipoles.reshape(total_dipoles.shape[0], int(total_dipoles.shape[1]/3), 3)
+        if None not in oscillator_contributions:
+            oscillator_contributions = torch.stack(oscillator_contributions, dim=1)
+            total_oscillator = torch.sum(oscillator_contributions, dim=1)  # [n_graphs, ]
+        else:
+            total_oscillator = torch.tensor([])
 
-        nacs_contributions = torch.stack(node_nacs_list, dim=1)
-        total_nacs = torch.sum(nacs_contributions, dim=1)  # [n_graphs, ]
+        if None not in dipoles_contributions:
+            dipole_contributions = torch.stack(dipoles_contributions, dim=1)
+            total_dipoles = torch.sum(dipole_contributions, dim=1)  # [n_graphs, ]
+        else:
+            total_dipoles = torch.tensor([])
 
-        socs_contributions = torch.stack(socs_contributions, dim=1)
-        total_socs = torch.sum(soc_contributions, dim=1)
+        if None not in nacs_contributions:
+            nacs_contributions = torch.stack(nacs_contributions, dim=1)
+            total_nacs = torch.sum(nacs_contributions, dim=1)  # [n_graphs, ]
+        else:
+            total_nacs = torch.tensor([])
 
-        # Outputs
+        if None not in socs_contributions:
+            socs_contributions = torch.stack(socs_contributions, dim=1)
+            total_socs = torch.sum(socs_contributions, dim=1)
+        else:
+            total_socs = torch.tensor([])
+
         forces, virials, stress, hessian = get_outputs(
-            energy=decoded_vals,
+            energy=energies,
             positions=data["positions"],
             displacement=displacement,
             cell=data["cell"],
@@ -1345,13 +1382,12 @@ class EmbeddingXMACE(torch.nn.Module):
             compute_stress=compute_stress,
             compute_hessian=compute_hessian,
         )
-        print(total_socs)
+        
         return {
-            "energy": decoded_vals,
-            "invariant_vals": invariant_vals,
-            "decoded_invariants": decoded_vals,
+            "energy": energies,
             "nacs": total_nacs,
             "dipoles": total_dipoles,
+            "oscillator": total_oscillator,
             "socs": total_socs,
             "forces": forces,
             "virials": virials,

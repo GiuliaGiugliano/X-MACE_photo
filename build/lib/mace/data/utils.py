@@ -24,6 +24,7 @@ Charges = np.ndarray  # [..., 1]
 Nacs = np.ndarray #[...,...,3]
 Socs = np.ndarray
 Cell = np.ndarray  # [3,3]
+Oscillator = np.ndarray
 Pbc = tuple  # (3,)
 
 DEFAULT_CONFIG_TYPE = "Default"
@@ -41,6 +42,7 @@ class Configuration:
     virials: Optional[Virials] = None  # eV
     dipoles: Optional[Vector] = None  # Debye
     charges: Optional[Charges] = None  # atomic unit
+    oscillator: Optional[Oscillator] = None  # atomic unit
     cell: Optional[Cell] = None
     pbc: Optional[Pbc] = None
     nacs: Optional[Nacs] = None
@@ -101,6 +103,7 @@ def config_from_atoms_list(
     nacs_key="REF_nacs",
     charges_key="REF_charges",
     socs_key="REF_socs",
+    oscillator_key="REF_oscillator",
     scalar_key="REF_scalar",
     config_type_weights: Dict[str, float] = None,
 ) -> Configurations:
@@ -122,6 +125,7 @@ def config_from_atoms_list(
                 socs_key=socs_key,
                 scalar_key=scalar_key,
                 charges_key=charges_key,
+                oscillator_key=oscillator_key,
                 config_type_weights=config_type_weights,
             )
         )
@@ -138,6 +142,7 @@ def config_from_atoms(
     charges_key="REF_charges",
     nacs_key="REF_nacs",
     socs_key="REF_socs",
+    oscillator_key="REF_oscillator",
     scalar_key="REF_scalar",
     config_type_weights: Dict[str, float] = None,
 ) -> Configuration:
@@ -150,7 +155,9 @@ def config_from_atoms(
     virials = atoms.info.get(virials_key, None)
     nacs = atoms.info.get(nacs_key, None)
     socs = atoms.info.get(socs_key, None)
+    oscillator = atoms.info.get(oscillator_key, None)
     scalar_params = atoms.info.get(scalar_key, None)
+    print(scalar_params.shape)
     dipoles = atoms.info.get(dipoles_key, None)  # Debye
     # Charges default to 0 instead of None if not found
     charges = atoms.arrays.get(charges_key, np.zeros(len(atoms)))  # atomic unit
@@ -181,7 +188,6 @@ def config_from_atoms(
         stress = np.zeros(6)
         stress_weight = 0.0
     if virials is None:
-        virials = np.zeros((3, 3))
         virials_weight = 0.0
     if dipoles is None:
         dipoles = np.zeros(3)
@@ -189,6 +195,8 @@ def config_from_atoms(
     if nacs is None:
         nacs = np.zeros(3)
         nacs_weight = 0.0
+    if socs is None:
+        socs = np.zeros(3)
 
     return Configuration(
         atomic_numbers=atomic_numbers,
@@ -200,6 +208,7 @@ def config_from_atoms(
         virials=virials,
         dipoles=dipoles,
         charges=charges,
+        oscillator=oscillator,
         nacs=nacs,
         socs=socs,
         weight=weight,
@@ -243,6 +252,7 @@ def load_from_xyz(
     charges_key: str = "REF_charges",
     nacs_key: str = 'REF_nacs',
     socs_key: str = 'REF_socs',
+    oscillator_key: str = 'REF_oscillator',
     scalar_key: str = "REF_scalar",
     extract_atomic_energies: bool = False,
     keep_isolated_atoms: bool = False,
@@ -322,6 +332,7 @@ def load_from_xyz(
         socs_key=socs_key,
         scalar_key=scalar_key,
         charges_key=charges_key,
+        oscillator_key=oscillator_key,
     )
     return atomic_energies_dict, configs
 

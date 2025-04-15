@@ -163,6 +163,9 @@ def run(args: argparse.Namespace) -> None:
             scalar_key=args.scalar_key,
             socs_key=args.socs_key,
             oscillator_key=args.oscillator_key,
+            kisc_key=args.kisc_key,
+            wavelen_key=args.wavelen_key,
+            hlgap_key=args.wavelen_key,
             nacs_key=args.nacs_key,
             keep_isolated_atoms=args.keep_isolated_atoms,
         )
@@ -310,6 +313,9 @@ def run(args: argparse.Namespace) -> None:
             nacs_weight = args.nacs_weight,
             socs_weight = args.socs_weight,
             oscillator_weight = args.oscillator_weight,
+            kisc_weight = args.kisc_weight,
+            hlgap_weight = args.hlgap_weight,
+            wavelen_weight = args.wavelen_weight,
         )
     elif args.model == "AutoencoderExcitedMACE":
         loss_fn = modules.InvariantsWeightedEnergyForcesNacsDipoleLoss(
@@ -326,6 +332,9 @@ def run(args: argparse.Namespace) -> None:
             nacs_weight = args.nacs_weight,
             socs_weight = args.socs_weight,
             oscillator_weight = args.oscillator_weight,
+            kisc_weight = args.kisc_weight,
+            hlgap_weight = args.hlgap_weight,
+            wavelen_weight = args.wavelen_weight,
         )
     
     
@@ -502,6 +511,9 @@ def run(args: argparse.Namespace) -> None:
             n_socs=args.n_socs,
             n_dipoles=args.n_dipoles,
             n_oscillators=args.n_oscillators,
+            n_kisc=args.n_kisc,
+            n_hlgap=args.n_hlgap,
+            n_wavelen=args.n_wavelen,
         )
 
     else:

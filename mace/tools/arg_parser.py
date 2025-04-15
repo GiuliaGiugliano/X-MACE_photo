@@ -100,6 +100,12 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--n_dipoles", help="Number of dipole moments", type=int, default=0)
 
+    parser.add_argument("--n_kisc", help="Number of kisc", type=int, default=0)
+
+    parser.add_argument("--wavelen", help="Number of wavelengths", type=int, default=0)
+
+    parser.add_argument("--n_hlgap", help="Number of homo lumo gap", type=int, default=0)
+
     parser.add_argument(
         "--error_table",
         help="Type of error table produced at the end of the training",
@@ -408,11 +414,24 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         default="REF_socs",
     )
     parser.add_argument(
-        "--oscillator_key",
-        help="Key of oscillator values in training xyz",
+        "--kisc_key",
+        help="Key of kisc in training xyz",
         type=str,
-        default="REF_oscillator",
+        default="REF_kisc",
     )
+    parser.add_argument(
+        "--wavelen_key",
+        help="Key of wavelengths in training xyz",
+        type=str,
+        default="REF_wavelen",
+    )
+    parser.add_argument(
+        "--hlgap_key",
+        help="Key of homo lumo gap in training xyz",
+        type=str,
+        default="REF_hlgap",
+    )
+
 
     # Loss and optimization
     parser.add_argument(
@@ -446,7 +465,15 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--socs_weight", help="weight of nacs loss", type=float, default=100.0
     )
-
+    parser.add_argument(
+        "--kisc_weight", help="weight of kisc loss", type=float, default=100.0
+    )
+    parser.add_argument(
+        "--wavelen_weight", help="weight of wavelen loss", type=float, default=100.0
+    )
+    parser.add_argument(
+        "--hlgap_weight", help="weight of hlgap loss", type=float, default=100.0
+    )
     parser.add_argument(
         "--swa_forces_weight",
         "--stage_two_forces_weight",

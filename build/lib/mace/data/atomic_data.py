@@ -38,6 +38,7 @@ class AtomicData(torch_geometric.data.Data):
     virials: torch.Tensor
     nacs: torch.Tensor
     socs: torch.Tensor
+    oscillator: torch.Tensor
     dipole: torch.Tensor
     charges: torch.Tensor
     weight: torch.Tensor
@@ -70,6 +71,7 @@ class AtomicData(torch_geometric.data.Data):
         virials: Optional[torch.Tensor],  # [1,3,3]
         dipoles: Optional[torch.Tensor],  # [, 3]
         charges: Optional[torch.Tensor],  # [n_nodes, ]
+        oscillator: Optional[torch.Tensor],
         nacs: Optional[torch.Tensor],
         socs: Optional[torch.Tensor]
     ):
@@ -111,6 +113,7 @@ class AtomicData(torch_geometric.data.Data):
             "dipoles_weight": dipoles_weight,
             "nacs_weight": nacs_weight,
             "scalar_weight": scalar_weight,
+            "oscillator": oscillator,
             "forces": forces,
             "energy": energy,
             "stress": stress,
@@ -225,18 +228,23 @@ class AtomicData(torch_geometric.data.Data):
             else None
         )
         nacs = (
-            torch.tensor(config.nacs, dtype=torch.get_default_dtype())
+            torch.tensor(config.nacs, dtype=torch.get_default_dtype()).unsqueeze(0)
             if config.nacs is not None
             else None
         )
         socs = (
-            torch.tensor(config.socs, dtype=torch.get_default_dtype())
+            torch.tensor(config.socs, dtype=torch.get_default_dtype()).unsqueeze(0)
             if config.socs is not None
             else None
         )
         charges = (
             torch.tensor(config.charges, dtype=torch.get_default_dtype())
             if config.charges is not None
+            else None
+        )
+        oscillator = (
+            torch.tensor(config.oscillator, dtype=torch.get_default_dtype()).unsqueeze(0)
+            if config.oscillator is not None
             else None
         )
 
@@ -261,6 +269,7 @@ class AtomicData(torch_geometric.data.Data):
             virials=virials,
             dipoles=dipoles,
             nacs=nacs,
+            oscillator=oscillator,
             socs=socs,
             scalar_params=scalar_params,
             charges=charges,

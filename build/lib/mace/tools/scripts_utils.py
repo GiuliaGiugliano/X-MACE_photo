@@ -49,10 +49,9 @@ def get_dataset_from_xyz(
     forces_key: str = "REF_forces",
     stress_key: str = "REF_stress",
     scalar_key: str = "REF_scalar",
-    virials_key: str = "virials",
-    dipoles_key: str = "dipoles",
-    nacs_key: str = "nacs",
-    charges_key: str = "charges",
+    dipoles_key: str = "REF_dipoles",
+    nacs_key: str = "REF_nacs",
+    oscillator_key: str = "REF_oscillator",
     socs_key: str = 'REF_socs',
 ) -> Tuple[SubsetCollection, Optional[Dict[int, float]]]:
     """Load training and test dataset from xyz file"""
@@ -62,12 +61,11 @@ def get_dataset_from_xyz(
         energy_key=energy_key,
         forces_key=forces_key,
         stress_key=stress_key,
-        virials_key=virials_key,
         dipoles_key=dipoles_key,
-        charges_key=charges_key,
         nacs_key = nacs_key,
         socs_key=socs_key,
         scalar_key=scalar_key,
+        oscillator_key=oscillator_key,
         extract_atomic_energies=True,
         keep_isolated_atoms=keep_isolated_atoms,
     )
@@ -85,6 +83,7 @@ def get_dataset_from_xyz(
             charges_key=charges_key,
             scalar_key=scalar_key,
             socs_key=socs_key,
+            oscillator_key=oscillator_key,
             extract_atomic_energies=False,
         )
         train_configs = all_train_configs
@@ -106,6 +105,7 @@ def get_dataset_from_xyz(
             virials_key=virials_key,
             charges_key=charges_key,
             socs_key=socs_key,
+            oscillator_key=oscillator_key,
             scalar_key=scalar_key,
             extract_atomic_energies=False,
         )
@@ -536,6 +536,13 @@ def create_error_table(
             "rel nacs RMSE %",
             "RMSE nacs / mDebye / atom",
             "rel nacs RMSE %",
+            "rel socs RMSE %",
+            "RMSE socs / mDebye / atom",
+            "rel socs RMSE %",
+            "rel oscillator RMSE %",
+            "RMSE oscillator / mDebye / atom",
+            "rel oscillator RMSE %",
+            
         ]
     elif table_type == "EnergyNacsDipoleMAE":
         table.field_names = [
@@ -544,6 +551,8 @@ def create_error_table(
             "MAE F",
             "MAE Mu",
             "MAE nacs",
+            "MAE socs",
+            "MAE oscillator"
         ]
 
     for name in sorted(all_data_loaders, key=custom_key):
@@ -696,6 +705,8 @@ def create_error_table(
                     f"{metrics['rmse_mu_per_atom'] * 1000:8.1f}",
                     f"{metrics['rel_rmse_mu']:8.1f}",
                     f"{metrics['rel_rmse_nacs']:8.1f}",
+                    f"{metrics['rel_rmse_socs']:8.1f}",
+                    f"{metrics['rel_rmse_oscillator']:8.1f}",
                 ]
             )
         elif table_type == "EnergyNacsDipoleMAE":
@@ -706,6 +717,8 @@ def create_error_table(
                     f"{metrics['mae_f']*1000:8.1f}",
                     f"{metrics['mae_mu']*1000:8.1f}",
                     f"{metrics['mae_nacs']*1000:8.1f}",
+                    f"{metrics['mae_socs']*1000:8.1f}",
+                    f"{metrics['mae_oscillator']*1000:8.1f}",                    
                 ]
             )
     return table

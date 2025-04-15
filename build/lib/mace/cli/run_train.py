@@ -159,10 +159,10 @@ def run(args: argparse.Namespace) -> None:
             energy_key=args.energy_key,
             forces_key=args.forces_key,
             stress_key=args.stress_key,
-            virials_key=args.virials_key,
             dipoles_key=args.dipoles_key,
-            charges_key=args.charges_key,
             scalar_key=args.scalar_key,
+            socs_key=args.socs_key,
+            oscillator_key=args.oscillator_key,
             nacs_key=args.nacs_key,
             keep_isolated_atoms=args.keep_isolated_atoms,
         )
@@ -223,7 +223,7 @@ def run(args: argparse.Namespace) -> None:
             else:
                 atomic_energies_dict = get_atomic_energies(args.E0s, None, z_table)
 
-    if args.model == "ExcitedMACE" or args.model == "AutoencoderExcitedMACE" or args.model == "EmbeddingXMACE":
+    if args.model == "ExcitedMACE" or args.model == "AutoencoderExcitedMACE" or args.model == "EmbeddingEMACE":
         atomic_energies = None
         compute_dipole = True
         compute_energy = True
@@ -308,6 +308,8 @@ def run(args: argparse.Namespace) -> None:
             forces_weight=args.forces_weight,
             dipoles_weight=args.dipoles_weight,
             nacs_weight = args.nacs_weight,
+            socs_weight = args.socs_weight,
+            oscillator_weight = args.oscillator_weight,
         )
     elif args.model == "AutoencoderExcitedMACE":
         loss_fn = modules.InvariantsWeightedEnergyForcesNacsDipoleLoss(
@@ -316,12 +318,14 @@ def run(args: argparse.Namespace) -> None:
             dipoles_weight=args.dipoles_weight,
             nacs_weight = args.nacs_weight,
         )
-    elif args.model == "EmbeddingXMACE":
-        loss_fn = modules.InvariantsWeightedEnergyForcesNacsDipoleLoss(
+    elif args.model == "EmbeddingEMACE":
+        loss_fn = modules.WeightedEnergyForcesNacsDipoleLoss(
             energy_weight=args.energy_weight,
             forces_weight=args.forces_weight,
             dipoles_weight=args.dipoles_weight,
             nacs_weight = args.nacs_weight,
+            socs_weight = args.socs_weight,
+            oscillator_weight = args.oscillator_weight,
         )
     
     
@@ -479,8 +483,8 @@ def run(args: argparse.Namespace) -> None:
             compute_dipoles=args.compute_dipoles,
         )
 
-    elif args.model == "EmbeddingXMACE":
-        model = modules.EmbeddingXMACE(
+    elif args.model == "EmbeddingEMACE":
+        model = modules.EmbeddingEMACE(
             **model_config,
             pair_repulsion=args.pair_repulsion,
             n_energies=args.n_energies,
@@ -497,6 +501,7 @@ def run(args: argparse.Namespace) -> None:
             n_nacs=args.n_nacs,
             n_socs=args.n_socs,
             n_dipoles=args.n_dipoles,
+            n_oscillators=args.n_oscillators,
         )
 
     else:
