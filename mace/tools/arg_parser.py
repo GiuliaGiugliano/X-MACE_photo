@@ -102,7 +102,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--n_kisc", help="Number of kisc", type=int, default=0)
 
-    parser.add_argument("--wavelen", help="Number of wavelengths", type=int, default=0)
+    parser.add_argument("--n_wavelen", help="Number of wavelengths", type=int, default=0)
 
     parser.add_argument("--n_hlgap", help="Number of homo lumo gap", type=int, default=0)
 
@@ -430,6 +430,12 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         help="Key of homo lumo gap in training xyz",
         type=str,
         default="REF_hlgap",
+    )
+    parser.add_argument(
+        "--oscillator_key",
+        help="Key of oscillator values in training xyz",
+        type=str,
+        default="REF_oscillator",
     )
 
 

@@ -39,6 +39,9 @@ class AtomicData(torch_geometric.data.Data):
     nacs: torch.Tensor
     socs: torch.Tensor
     oscillator: torch.Tensor
+    kisc: torch.Tensor
+    hlgap: torch.Tensor
+    wavelen: torch.Tensor
     dipole: torch.Tensor
     charges: torch.Tensor
     weight: torch.Tensor
@@ -46,6 +49,10 @@ class AtomicData(torch_geometric.data.Data):
     forces_weight: torch.Tensor
     stress_weight: torch.Tensor
     virials_weight: torch.Tensor
+    oscillator_weight: torch.Tensor
+    hlgap_weight: torch.Tensor
+    kisc_weight: torch.Tensor
+    wavelen_weight: torch.Tensor
     scalar_weight: torch.Tensor
 
     def __init__(
@@ -72,6 +79,9 @@ class AtomicData(torch_geometric.data.Data):
         dipoles: Optional[torch.Tensor],  # [, 3]
         charges: Optional[torch.Tensor],  # [n_nodes, ]
         oscillator: Optional[torch.Tensor],
+        hlgap: Optional[torch.Tensor],
+        kisc: Optional[torch.Tensor],
+        wavelen: Optional[torch.Tensor],
         nacs: Optional[torch.Tensor],
         socs: Optional[torch.Tensor]
     ):
@@ -114,6 +124,9 @@ class AtomicData(torch_geometric.data.Data):
             "nacs_weight": nacs_weight,
             "scalar_weight": scalar_weight,
             "oscillator": oscillator,
+            "kisc": kisc,
+            "wavelen": wavelen,
+            "hlgap": hlgap,
             "forces": forces,
             "energy": energy,
             "stress": stress,
@@ -247,7 +260,21 @@ class AtomicData(torch_geometric.data.Data):
             if config.oscillator is not None
             else None
         )
-
+        kisc = (
+            torch.tensor(config.kisc, dtype=torch.get_default_dtype()).unsqueeze(0)
+            if config.kisc is not None
+            else None
+        )
+        hlgap = (
+            torch.tensor(config.hlgap, dtype=torch.get_default_dtype()).unsqueeze(0)
+            if config.hlgap is not None
+            else None
+        )
+        wavelen = (
+            torch.tensor(config.wavelen, dtype=torch.get_default_dtype()).unsqueeze(0)
+            if config.wavelen is not None
+            else None
+        )
         return cls(
             edge_index=torch.tensor(edge_index, dtype=torch.long),
             positions=torch.tensor(config.positions, dtype=torch.get_default_dtype()),
@@ -261,6 +288,9 @@ class AtomicData(torch_geometric.data.Data):
             stress_weight=stress_weight,
             virials_weight=virials_weight,
             dipoles_weight=dipoles_weight,
+            kisc_weight=kisc_weight,
+            wavelen_weight=wavelen_weight,
+            hlgap_weight=hlgap_weight,
             nacs_weight=nacs_weight,
             scalar_weight=scalar_weight,
             forces=forces,

@@ -127,6 +127,9 @@ def valid_err_log(valid_loss, eval_metrics, logger, log_errors, epoch=None):
         error_nacs = eval_metrics["rmse_nacs_per_atom"] * 1e3
         error_socs = eval_metrics["rmse_socs_per_atom"] * 1e3
         error_oscillator = eval_metrics["rmse_oscillator_per_atom"] * 1e3
+        error_kisc = eval_metrics["rmse_kisc_per_atom"] * 1e3
+        error_hlgap = eval_metrics["rmse_hlgap_per_atom"] * 1e3
+        error_wavelen = eval_metrics["rmse_wavelen_per_atom"] * 1e3
         logging.info(
             f"{inintial_phrase}: loss={valid_loss:8.4f}, RMSE_E_per_atom={error_e:8.1f} meV, RMSE_F={error_f:8.1f} meV / A, RMSE_Mu_per_atom={error_mu:8.2f} mDebye, RMSE_Nacs_per_atom={error_nacs:8.2f}",
         )
@@ -473,6 +476,18 @@ class MACELoss(Metric):
         self.add_state("oscillator", default=[], dist_reduce_fx="cat")
         self.add_state("delta_oscillator", default=[], dist_reduce_fx="cat")
         self.add_state("delta_oscillator_per_atom", default=[], dist_reduce_fx="cat")
+        self.add_state("kisc_computed", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("kisc", default=[], dist_reduce_fx="cat")
+        self.add_state("delta_kisc", default=[], dist_reduce_fx="cat")
+        self.add_state("delta_kisc_per_atom", default=[], dist_reduce_fx="cat")
+        self.add_state("hlgap_computed", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("hlgap", default=[], dist_reduce_fx="cat")
+        self.add_state("delta_hlgap", default=[], dist_reduce_fx="cat")
+        self.add_state("delta_hlgap_per_atom", default=[], dist_reduce_fx="cat")
+        self.add_state("wavelen_computed", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("wavelen", default=[], dist_reduce_fx="cat")
+        self.add_state("delta_wavelen", default=[], dist_reduce_fx="cat")
+        self.add_state("delta_wavelen_per_atom", default=[], dist_reduce_fx="cat")
 
     def update(self, batch, output):  # pylint: disable=arguments-differ
         loss = self.loss_fn(pred=output, ref=batch)
@@ -520,7 +535,24 @@ class MACELoss(Metric):
             print(output["oscillator"])
             print(batch.oscillator)
             self.delta_oscillator.append(batch.oscillator - output["oscillator"])
-
+        if output.get("kisc") is not None and (batch.kisc != 0).any():
+            self.kisc_computed += 1.0
+            self.kisc.append(batch.kisc)
+            print(output["kisc"])
+            print(batch.kisc)
+            self.delta_kisc.append(batch.kisc - output["kisc"])
+        if output.get("hlgap") is not None and (batch.hlgap != 0).any():
+            self.hlgap_computed += 1.0
+            self.hlgap.append(batch.hlgap)
+            print(output["hlgap"])
+            print(batch.hlgap)
+            self.delta_hlgap.append(batch.hlgap - output["hlgap"])
+        if output.get("wavelen") is not None and (batch.wavelen != 0).any():
+            self.wavelen_computed += 1.0
+            self.wavelen.append(batch.wavelen)
+            print(output["wavelen"])
+            print(batch.wavelen)
+            self.delta_wavelen.append(batch.wavelen - output["wavelen"])
     def convert(self, delta: Union[torch.Tensor, List[torch.Tensor]]) -> np.ndarray:
         if isinstance(delta, list):
             delta = torch.cat(delta)
@@ -594,5 +626,31 @@ class MACELoss(Metric):
             aux["rmse_oscillator"] = compute_rmse(delta_oscillator)
             aux["rel_rmse_oscillator"] = compute_rel_rmse(delta_oscillator, oscillator)
             aux["q95_oscillator"] = compute_q95(delta_oscillator)
+        if self.kisc_computed:
+            kisc = self.convert(self.kisc)
+            delta_kisc = self.convert(self.delta_kisc)
+            aux["mae_kisc"] = compute_mae(delta_kisc)
+            aux["rel_mae_kisc"] = compute_rel_mae(delta_kisc, kisc)
+            aux["rmse_kisc"] = compute_rmse(delta_kisc)
+            aux["rel_rmse_kisc"] = compute_rel_rmse(delta_kisc, kisc)
+            aux["q95_kisc"] = compute_q95(delta_kisc)
+        if self.wavelen_computed:
+            wavelen = self.convert(self.wavelen)
+            delta_wavelen = self.convert(self.delta_wavelen)
+            aux["mae_wavelen"] = compute_mae(delta_wavelen)
+            aux["rel_mae_wavelen"] = compute_rel_mae(delta_wavelen, wavelen)
+            aux["rmse_wavelen"] = compute_rmse(delta_wavelen)
+            aux["rel_rmse_wavelen"] = compute_rel_rmse(delta_wavelen, wavelen)
+            aux["q95_wavelen"] = compute_q95(delta_wavelen)
+        if self.hlgap_computed:
+            hlgap = self.convert(self.hlgap)
+            delta_hlgap = self.convert(self.delta_hlgap)
+            aux["mae_hlgap"] = compute_mae(delta_hlgap)
+            aux["rel_mae_hlgap"] = compute_rel_mae(delta_hlgap, hlgap)
+            aux["rmse_hlgap"] = compute_rmse(delta_hlgap)
+            aux["rel_rmse_hlgap"] = compute_rel_rmse(delta_hlgap, hlgap)
+            aux["q95_hlgap"] = compute_q95(delta_hlgap)
+        
+    
 
         return aux["loss"], aux

@@ -26,6 +26,17 @@ def oscillator_error(ref: Batch, pred: TensorDict) -> torch.Tensor:
 def mean_squared_soc_error(ref: Batch, pred: TensorDict) -> torch.Tensor:
     return torch.mean(torch.square(ref["socs"] - pred["socs"]))
 
+def mean_squared_kisc_error(ref: Batch, pred: TensorDict) -> torch.Tensor:
+    return torch.mean(torch.square(ref["kisc"] - pred["kisc"]))
+
+def mean_squared_hlgap_error(ref: Batch, pred: TensorDict) -> torch.Tensor:
+    return torch.mean(torch.square(ref["hlgap"] - pred["hlgap"]))
+
+def mean_squared_wavelen_error(ref: Batch, pred: TensorDict) -> torch.Tensor:
+    return torch.mean(torch.square(ref["wavelen"] - pred["wavelen"]))
+
+
+
 def weighted_mean_squared_error_energy(ref: Batch, pred: TensorDict) -> torch.Tensor:
     # energy: [n_graphs, ]
     configs_weight = ref.weight  # [n_graphs, ]
@@ -393,7 +404,18 @@ class WeightedEnergyForcesNacsDipoleLoss(torch.nn.Module):
             "oscillator_weight",
             torch.tensor(oscillator_weight, dtype=torch.get_default_dtype()),
         )
-
+        self.register_buffer(
+            "kisc_weight",
+            torch.tensor(kisc_weight, dtype=torch.get_default_dtype()),
+        )
+        self.register_buffer(
+            "wavelen_weight",
+            torch.tensor(wavelen_weight, dtype=torch.get_default_dtype()),
+        )
+        self.register_buffer(
+            "hlgap_weight",
+            torch.tensor(hlgap_weight, dtype=torch.get_default_dtype()),
+        )
     def is_nonzero(self, vector):
         """Returns True if the vector (converted to a NumPy array) is not all zeros."""
         arr = np.array(vector)
@@ -420,7 +442,17 @@ class WeightedEnergyForcesNacsDipoleLoss(torch.nn.Module):
 
         if ref["oscillator"] is not None and not torch.all(ref["oscillator"] == 0).item():
             loss += self.oscillator_weight * oscillator_error(ref, pred)
+
+        if ref["kisc"] is not None and not torch.all(ref["kisc"] == 0).item():
+            loss += self.kisc_weight * kisc_error(ref, pred)
+
+        if ref["hlgap"] is not None and not torch.all(ref["hlgap"] == 0).item():
+            loss += self.hlgap_weight * hlgap_error(ref, pred)
+        
+        if ref["wavelen"] is not None and not torch.all(ref["wavelen"] == 0).item():
+            loss += self.wavelen_weight * wavelen_error(ref, pred)
         return loss
+
 
 
     def __repr__(self):

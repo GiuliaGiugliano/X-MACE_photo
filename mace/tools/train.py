@@ -535,7 +535,7 @@ class MACELoss(Metric):
             print(output["oscillator"])
             print(batch.oscillator)
             self.delta_oscillator.append(batch.oscillator - output["oscillator"])
-         if output.get("kisc") is not None and (batch.kisc != 0).any():
+        if output.get("kisc") is not None and (batch.kisc != 0).any():
             self.kisc_computed += 1.0
             self.kisc.append(batch.kisc)
             print(output["kisc"])

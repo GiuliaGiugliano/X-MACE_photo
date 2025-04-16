@@ -25,6 +25,9 @@ Nacs = np.ndarray #[...,...,3]
 Socs = np.ndarray
 Cell = np.ndarray  # [3,3]
 Oscillator = np.ndarray
+Kisc = np.ndarray
+HLgap = np.ndarray
+Wavelen = np.ndarray
 Pbc = tuple  # (3,)
 
 DEFAULT_CONFIG_TYPE = "Default"
@@ -43,6 +46,9 @@ class Configuration:
     dipoles: Optional[Vector] = None  # Debye
     charges: Optional[Charges] = None  # atomic unit
     oscillator: Optional[Oscillator] = None  # atomic unit
+    kisc: Optional[Kisc] = None
+    hlgap: Optional[HLgap] = None
+    wavelen: Optional[Wavelen] = None
     cell: Optional[Cell] = None
     pbc: Optional[Pbc] = None
     nacs: Optional[Nacs] = None
@@ -104,6 +110,9 @@ def config_from_atoms_list(
     charges_key="REF_charges",
     socs_key="REF_socs",
     oscillator_key="REF_oscillator",
+    kisc_key="REF_kisc",
+    hlgap_key="REF_hlgap",
+    wavelen_key="REF_wavelen",
     scalar_key="REF_scalar",
     config_type_weights: Dict[str, float] = None,
 ) -> Configurations:
@@ -126,6 +135,9 @@ def config_from_atoms_list(
                 scalar_key=scalar_key,
                 charges_key=charges_key,
                 oscillator_key=oscillator_key,
+                kisc_key=kisc_key,
+                hlgap_key=hlgap_key,
+                wavelen_key=wavelen_key,
                 config_type_weights=config_type_weights,
             )
         )
@@ -143,6 +155,9 @@ def config_from_atoms(
     nacs_key="REF_nacs",
     socs_key="REF_socs",
     oscillator_key="REF_oscillator",
+    kisc_key="REF_kisc",
+    hlgap_key="REF_hlgap",
+    wavelen_key="REF_wavelen",
     scalar_key="REF_scalar",
     config_type_weights: Dict[str, float] = None,
 ) -> Configuration:
@@ -156,6 +171,10 @@ def config_from_atoms(
     nacs = atoms.info.get(nacs_key, None)
     socs = atoms.info.get(socs_key, None)
     oscillator = atoms.info.get(oscillator_key, None)
+    kisc = atoms.info.get(kisc_key, None)
+    hlgap = atoms.info.get(hlgap_key, None)
+    wavelen = atoms.info.get(wavelen_key, None)
+
     scalar_params = atoms.info.get(scalar_key, None)
     print(scalar_params.shape)
     dipoles = atoms.info.get(dipoles_key, None)  # Debye
@@ -197,6 +216,22 @@ def config_from_atoms(
         nacs_weight = 0.0
     if socs is None:
         socs = np.zeros(3)
+        socs_weight = 0.0 
+    if kisc is None:
+        kisc = 0.0
+        kisc_weight = 0.0
+    if hlgap is None:
+        hlgap = 0.0
+        hlgap_weight = 0.0
+    if wavelen is None:
+        wavelen = 0.0
+        wavelen_weight = 0.0    
+    if oscillator is None:
+        oscillator = 0.0
+        oscillator_weight = 0.0
+    
+
+
 
     return Configuration(
         atomic_numbers=atomic_numbers,
@@ -211,6 +246,9 @@ def config_from_atoms(
         oscillator=oscillator,
         nacs=nacs,
         socs=socs,
+        kisc=kisc,
+        hlgap=hlgap,
+        wavelen=wavelen,
         weight=weight,
         energy_weight=energy_weight,
         forces_weight=forces_weight,
@@ -218,6 +256,11 @@ def config_from_atoms(
         virials_weight=virials_weight,
         dipoles_weight=dipoles_weight,
         nacs_weight=nacs_weight,
+        socs_weight=socs_weight,
+        kisc_weight=kisc_weight,
+        hlgap_weight=hlgap_weight,
+        wavelen_weight=wavelen_weight,
+        oscillator_weight=oscillator_weight,
         scalar_weight=scalar_weight,
         config_type=config_type,
         pbc=pbc,
@@ -253,6 +296,9 @@ def load_from_xyz(
     nacs_key: str = 'REF_nacs',
     socs_key: str = 'REF_socs',
     oscillator_key: str = 'REF_oscillator',
+    kisc_key="REF_kisc",
+    hlgap_key="REF_hlgap",
+    wavelen_key="REF_wavelen",
     scalar_key: str = "REF_scalar",
     extract_atomic_energies: bool = False,
     keep_isolated_atoms: bool = False,
@@ -330,6 +376,9 @@ def load_from_xyz(
         dipoles_key=dipoles_key,
         nacs_key=nacs_key,
         socs_key=socs_key,
+        kisc_key=kisc_key,
+        hlgap_key=hlgap_key,
+        wavelen_key=wavelen_key,
         scalar_key=scalar_key,
         charges_key=charges_key,
         oscillator_key=oscillator_key,

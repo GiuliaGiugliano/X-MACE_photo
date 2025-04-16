@@ -52,6 +52,9 @@ def get_dataset_from_xyz(
     dipoles_key: str = "REF_dipoles",
     nacs_key: str = "REF_nacs",
     oscillator_key: str = "REF_oscillator",
+    kisc_key: str = "REF_kisc",
+    wavelen_key: str = "REF_wavelen",
+    hlgap_key: str = "REF_hlgap",
     socs_key: str = 'REF_socs',
 ) -> Tuple[SubsetCollection, Optional[Dict[int, float]]]:
     """Load training and test dataset from xyz file"""
@@ -66,6 +69,9 @@ def get_dataset_from_xyz(
         socs_key=socs_key,
         scalar_key=scalar_key,
         oscillator_key=oscillator_key,
+        kisc_key=kisc_key,
+        wavelen_key=wavelen_key,
+        hlgap_key=hlgap_key,
         extract_atomic_energies=True,
         keep_isolated_atoms=keep_isolated_atoms,
     )
@@ -84,6 +90,9 @@ def get_dataset_from_xyz(
             scalar_key=scalar_key,
             socs_key=socs_key,
             oscillator_key=oscillator_key,
+            kisc_key=kisc_key,
+            wavelen_key=wavelen_key,
+            hlgap_key=hlgap_key,
             extract_atomic_energies=False,
         )
         train_configs = all_train_configs
@@ -105,6 +114,9 @@ def get_dataset_from_xyz(
             virials_key=virials_key,
             charges_key=charges_key,
             socs_key=socs_key,
+            kisc_key=kisc_key,
+            wavelen_key=wavelen_key,
+            hlgap_key=hlgap_key,
             oscillator_key=oscillator_key,
             scalar_key=scalar_key,
             extract_atomic_energies=False,
@@ -534,14 +546,23 @@ def create_error_table(
             "RMSE MU / mDebye / atom",
             "rel MU RMSE %",
             "rel nacs RMSE %",
-            "RMSE nacs / mDebye / atom",
+            "RMSE nacs / A-1 / atom",
             "rel nacs RMSE %",
             "rel socs RMSE %",
-            "RMSE socs / mDebye / atom",
+            "RMSE socs / cm-1 / atom",
             "rel socs RMSE %",
             "rel oscillator RMSE %",
-            "RMSE oscillator / mDebye / atom",
+            "RMSE oscillator / atom",
             "rel oscillator RMSE %",
+            "RMSE kisc",
+            "rel kisc RMSE %",
+            "RMSE wavelen / nm",
+            "rel wavelen RMSE %"
+            "RMSE hlgap / meV",
+            "rel hlgap RMSE %"
+
+
+
             
         ]
     elif table_type == "EnergyNacsDipoleMAE":
@@ -552,7 +573,10 @@ def create_error_table(
             "MAE Mu",
             "MAE nacs",
             "MAE socs",
-            "MAE oscillator"
+            "MAE oscillator",
+            "MAE kisc",
+            "MAE wavelen",
+            "MAE hlgap"
         ]
 
     for name in sorted(all_data_loaders, key=custom_key):

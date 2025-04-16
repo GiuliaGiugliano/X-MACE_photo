@@ -460,6 +460,10 @@ class ExcitedMACE(torch.nn.Module):
         compute_nacs: bool,
         compute_dipoles: bool,
         compute_socs: bool,
+        compute_kisc: int,
+        compute_hlgap: int,
+        compute_wavelen: int,
+        compute_oscillator: int,
         interaction_cls: Type[InteractionBlock],
         interaction_cls_first: Type[InteractionBlock],
         num_interactions: int,
@@ -537,6 +541,10 @@ class ExcitedMACE(torch.nn.Module):
         self.compute_socs = compute_socs
         self.compute_dipoles = compute_dipoles
         self.compute_nacs = compute_nacs
+        self.compute_kisc = compute_kisc
+        self.compute_wavelen = compute_wavelen
+        self.compute_hlgap = compute_hlgap
+        self.compute_oscillator = compute_oscillator
         self.soc_indices = 45
 
         # Use the appropriate self connection at the first layer for proper E0
@@ -1063,6 +1071,9 @@ class EmbeddingEMACE(torch.nn.Module):
         n_socs: int,
         n_dipoles: int,
         n_oscillators: int,
+        n_kisc: int,
+        n_hlgap: int,
+        n_wavelen: int,
         hidden_irreps: o3.Irreps,
         MLP_irreps: o3.Irreps,
         atomic_energies: np.ndarray,
@@ -1091,8 +1102,11 @@ class EmbeddingEMACE(torch.nn.Module):
         self.n_socs = n_socs
         self.n_dipoles = n_dipoles
         self.n_oscillators = n_oscillators
-        self.total_o0 = self.n_energies + self.n_oscillators
-        self.total_o1 = self.n_nacs + self.n_socs + self.n_dipoles
+        self.n_kisc = n_kisc
+        self.n_hlgap = n_hlgap
+        self.n_wavelen = n_wavelen
+        self.total_o0 = self.n_energies + self.n_oscillators + self.n_kisc + self.n_hlgap + self.n_wavelen
+        self.total_o1 = self.n_nacs + self.n_socs + self.n_dipoles 
         self.num_permutational_invariant = num_permutational_invariant
 
         if isinstance(correlation, int):
@@ -1254,6 +1268,9 @@ class EmbeddingEMACE(torch.nn.Module):
         nacs_contributions = []
         socs_contributions = []
         oscillator_contributions = []
+        kisc_contributions = []
+        hlgap_contributions = []
+        wavelen_contributions = []
 
         for interaction, product, readout in zip(
             self.interactions, self.products, self.readouts
@@ -1275,7 +1292,9 @@ class EmbeddingEMACE(torch.nn.Module):
             node_output = readout(node_feats).squeeze(-1)
             node_energies = torch.transpose(node_output[:, :self.n_energies], 0, 1)
             node_oscillators = torch.transpose(node_output[:, self.n_energies: self.n_energies + self.n_oscillators], 0, 1)
-
+            node_kisc = torch.transpose(node_output[:, self.n_energies + self.n_oscillators: self.n_energies + self.n_oscillators + self.n_kisc], 0, 1)
+            node_hlgap = torch.transpose(node_output[:, self.n_energies + self.n_oscillators + self.n_kisc: self.n_energies + self.n_oscillators + self.n_kisc + self.n_hlgap], 0, 1)
+            node_wavelen = torch.transpose(node_output[:, self.n_energies + self.n_oscillators + self.n_kisc + self.n_hlgap: self.n_energies + self.n_oscillators + self.n_kisc + self.n_hlgap + self.n_wavelen], 0, 1)
             node_vector_output = node_output[:, self.n_energies + self.n_oscillators:]
             node_nacs = node_vector_output[:, :self.n_nacs*3] if self.n_nacs else node_vector_output[:0]
             node_dipoles = node_vector_output[:, self.n_nacs*3: (self.n_nacs+self.n_dipoles)*3] if self.n_dipoles else node_vector_output[:0]
@@ -1333,11 +1352,48 @@ class EmbeddingEMACE(torch.nn.Module):
                 )
                 socs = torch.transpose(socs, 0, 1)
                 socs = socs.reshape(socs.shape[0], self.n_socs, 3)
+            if node_kisc.numel() == 0:
+                kisc = None
+            else:
+                kisc = scatter_sum(
+                    src=node_kisc,
+                    index=data["batch"],
+                    dim=-1,
+                    dim_size=num_graphs
+                )
+                kisc = torch.transpose(kisc, 0, 1)
+            
+            if node_hlgap.numel() == 0:
+                hlgap = None
+            else:
+                hlgap = scatter_sum(
+                    src=node_hlgap,
+                    index=data["batch"],
+                    dim=-1,
+                    dim_size=num_graphs
+                )
+                hlgap = torch.transpose(hlgap, 0, 1)
+            
+            if node_wavelen.numel() == 0:
+                wavelen = None
+            else:
+                wavelen = scatter_sum(
+                    src=node_wavelen,
+                    index=data["batch"],
+                    dim=-1,
+                    dim_size=num_graphs
+                )
+                wavelen = torch.transpose(wavelen, 0, 1)
+            
+            
 
             dipoles_contributions.append(dipoles)
             socs_contributions.append(socs)
             nacs_contributions.append(nacs)
             oscillator_contributions.append(oscillators)
+            kisc_contributions.append(kisc)
+            hlgap_contributions.append(hlgap)
+            wavelen_contributions.append(wavelen)
             energies.append(torch.transpose(energy, 0, 1))
             node_energies_list.append(torch.transpose(node_energies, 0, 1))
 
@@ -1370,6 +1426,19 @@ class EmbeddingEMACE(torch.nn.Module):
             total_socs = torch.sum(socs_contributions, dim=1)
         else:
             total_socs = torch.tensor([])
+        
+        if None not in kisc_contributions:
+            kisc_contributions = torch.stack(kisc_contributions, dim=1)
+        else:
+            total_kisc = torch.tensor([])
+        if None not in hlgap_contributions:
+            hlgap_contributions = torch.stack(hlgap_contributions, dim=1)
+        else:
+            total_hlgap = torch.tensor([])
+        if None not in wavelen_contributions:
+            wavelen_contributions = torch.stack(wavelen_contributions, dim=1)
+        else:
+            total_wavelen = torch.tensor([])
 
         forces, virials, stress, hessian = get_outputs(
             energy=energies,
@@ -1389,6 +1458,9 @@ class EmbeddingEMACE(torch.nn.Module):
             "dipoles": total_dipoles,
             "oscillator": total_oscillator,
             "socs": total_socs,
+            "kisc": total_kisc,
+            "hlgap": total_hlgap,
+            "wavelen": total_wavelen,
             "forces": forces,
             "virials": virials,
             "stress": stress,
