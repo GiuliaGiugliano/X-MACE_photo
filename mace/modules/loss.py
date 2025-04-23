@@ -20,7 +20,7 @@ def mean_squared_error_invariants(ref: Batch, pred: TensorDict) -> torch.Tensor:
 def reconstruction_error_invariants(ref: Batch, pred: TensorDict) -> torch.Tensor:
     return torch.mean(torch.square(ref["energy"] - pred["energy"]))
 
-def oscillator_error(ref: Batch, pred: TensorDict) -> torch.Tensor:
+def mean_squared_oscillator_error(ref: Batch, pred: TensorDict) -> torch.Tensor:
     return torch.mean(torch.square(ref["oscillator"] - pred["oscillator"]))
 
 def mean_squared_soc_error(ref: Batch, pred: TensorDict) -> torch.Tensor:
@@ -378,7 +378,7 @@ class WeightedEnergyForcesDipoleLoss(torch.nn.Module):
         )
 
 class WeightedEnergyForcesNacsDipoleLoss(torch.nn.Module):
-    def __init__(self, energy_weight=1.0, forces_weight=1.0, dipoles_weight=1.0, nacs_weight=1.0, socs_weight=10.0, oscillator_weight=10.0) -> None:
+    def __init__(self, energy_weight=0, forces_weight=0, dipoles_weight=0, nacs_weight=0, socs_weight=0, hlgap_weight=0, oscillator_weight=0, kisc_weight=0, wavelen_weight=0) -> None:
         super().__init__()
         self.register_buffer(
             "energy_weight",
@@ -434,23 +434,20 @@ class WeightedEnergyForcesNacsDipoleLoss(torch.nn.Module):
         if ref["nacs"] is not None and not torch.all(ref["nacs"] == 0).item():
             loss += self.nacs_weight * phase_rmse_loss(ref, pred)
 
-        if ref["socs"] is not None and not torch.all(ref["socs"] == 0).item():
-            loss += self.socs_weight * mean_squared_soc_error(ref, pred) * 0
-
         if ref["dipoles"] is not None and not torch.all(ref["dipoles"] == 0).item():
             loss += self.dipoles_weight * weighted_mean_squared_error_dipole(ref, pred) 
 
         if ref["oscillator"] is not None and not torch.all(ref["oscillator"] == 0).item():
-            loss += self.oscillator_weight * oscillator_error(ref, pred)
+            loss += self.oscillator_weight * mean_squared_oscillator_error(ref, pred)
 
         if ref["kisc"] is not None and not torch.all(ref["kisc"] == 0).item():
-            loss += self.kisc_weight * kisc_error(ref, pred)
+            loss += self.kisc_weight * mean_squared_kisc_error(ref, pred)
 
         if ref["hlgap"] is not None and not torch.all(ref["hlgap"] == 0).item():
-            loss += self.hlgap_weight * hlgap_error(ref, pred)
+            loss += self.hlgap_weight * mean_squared_hlgap_error(ref, pred)
         
         if ref["wavelen"] is not None and not torch.all(ref["wavelen"] == 0).item():
-            loss += self.wavelen_weight * wavelen_error(ref, pred)
+            loss += self.wavelen_weight * mean_squared_wavelen_error(ref, pred)
         return loss
 
 

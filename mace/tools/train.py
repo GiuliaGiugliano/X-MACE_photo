@@ -521,14 +521,6 @@ class MACELoss(Metric):
             vec = torch.cat((pos,neg),dim=-1)
             val = torch.min(vec, dim=-1)[0]
             self.delta_nacs.append(val)
-        if output.get("socs") is not None and (batch.socs != 0).any():
-            self.socs_computed += 1.0
-            self.socs.append(batch.socs)
-            neg = torch.abs(batch.socs - output["socs"]).unsqueeze(-1)
-            #pos = torch.abs(batch.socs + output["socs"]).unsqueeze(-1)
-            #vec = torch.cat((pos,neg),dim=-1)
-            #val = torch.min(vec, dim=-1)[0]
-            self.delta_socs.append(neg)
         if output.get("oscillator") is not None and (batch.oscillator != 0).any():
             self.oscillator_computed += 1.0
             self.oscillator.append(batch.oscillator)

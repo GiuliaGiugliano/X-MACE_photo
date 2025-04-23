@@ -62,6 +62,10 @@ class Configuration:
     scalar_weight: float = 1.0
     nacs_weight: float = 1.0
     socs_weight: float = 1.0
+    oscillator_weight: float = 1.0
+    wavelen_weight: float = 1.0
+    kisc_weight: float = 1.0
+    hlgap_weight: float = 1.0
     config_type: Optional[str] = DEFAULT_CONFIG_TYPE  # config_type of config
 
 
@@ -195,6 +199,11 @@ def config_from_atoms(
     virials_weight = atoms.info.get("config_virials_weight", 1.0)
     dipoles_weight = atoms.info.get("config_dipoles_weight", 1.0)
     nacs_weight = atoms.info.get("config_nacs_weight", 1.0)
+    socs_weight = atoms.info.get("config_socs_weight", 1.0)
+    oscillator_weight = atoms.info.get("config_oscillator_weight", 1.0)
+    kisc_weight = atoms.info.get("config_kisc_weight", 1.0)
+    wavelen_weight = atoms.info.get("config_wavelen_weight", 1.0)
+    hlgap_weight = atoms.info.get("config_hlgap_weight", 1.0)
     scalar_weight = atoms.info.get("scalar_weight", 1.0)
     # fill in missing quantities but set their weight to 0.0
     if energy is None:
@@ -293,12 +302,12 @@ def load_from_xyz(
     virials_key: str = "REF_virials",
     dipoles_key: str = "REF_dipoles",
     charges_key: str = "REF_charges",
-    nacs_key: str = 'REF_nacs',
-    socs_key: str = 'REF_socs',
-    oscillator_key: str = 'REF_oscillator',
-    kisc_key="REF_kisc",
-    hlgap_key="REF_hlgap",
-    wavelen_key="REF_wavelen",
+    nacs_key: str = "REF_nacs",
+    socs_key: str = "REF_socs",
+    oscillator_key: str = "REF_oscillator",
+    kisc_key: str = "REF_kisc",
+    hlgap_key: str = "REF_hlgap",
+    wavelen_key: str = "REF_wavelen",
     scalar_key: str = "REF_scalar",
     extract_atomic_energies: bool = False,
     keep_isolated_atoms: bool = False,

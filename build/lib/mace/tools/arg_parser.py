@@ -439,7 +439,6 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     )
 
 
-
     # Loss and optimization
     parser.add_argument(
         "--loss",

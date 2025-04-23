@@ -1429,14 +1429,18 @@ class EmbeddingEMACE(torch.nn.Module):
         
         if None not in kisc_contributions:
             kisc_contributions = torch.stack(kisc_contributions, dim=1)
+            total_kisc = torch.sum(kisc_contributions, dim=1)  # [n_graphs, ]
         else:
             total_kisc = torch.tensor([])
+
         if None not in hlgap_contributions:
             hlgap_contributions = torch.stack(hlgap_contributions, dim=1)
+            total_hlgap = torch.sum(hlgap_contributions, dim=1)  # [n_graphs, ]
         else:
             total_hlgap = torch.tensor([])
         if None not in wavelen_contributions:
             wavelen_contributions = torch.stack(wavelen_contributions, dim=1)
+            total_wavelen = torch.sum(wavelen_contributions, dim=1)  # [n_graphs, ]
         else:
             total_wavelen = torch.tensor([])
 
