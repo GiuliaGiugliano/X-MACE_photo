@@ -526,25 +526,25 @@ class MACELoss(Metric):
             self.oscillator.append(batch.oscillator)
             print(output["oscillator"])
             print(batch.oscillator)
-            self.delta_oscillator.append(batch.oscillator - output["oscillator"])
+            self.delta_oscillator.append(batch.oscillator.squeeze() - output["oscillator"])
         if output.get("kisc") is not None and (batch.kisc != 0).any():
             self.kisc_computed += 1.0
             self.kisc.append(batch.kisc)
             print(output["kisc"])
             print(batch.kisc)
-            self.delta_kisc.append(batch.kisc - output["kisc"])
+            self.delta_kisc.append(batch.kisc.squeeze() - output["kisc"])
         if output.get("hlgap") is not None and (batch.hlgap != 0).any():
             self.hlgap_computed += 1.0
             self.hlgap.append(batch.hlgap)
             print(output["hlgap"])
             print(batch.hlgap)
-            self.delta_hlgap.append(batch.hlgap - output["hlgap"])
+            self.delta_hlgap.append(batch.hlgap.squeeze() - output["hlgap"])
         if output.get("wavelen") is not None and (batch.wavelen != 0).any():
             self.wavelen_computed += 1.0
             self.wavelen.append(batch.wavelen)
             print(output["wavelen"])
             print(batch.wavelen)
-            self.delta_wavelen.append(batch.wavelen - output["wavelen"])
+            self.delta_wavelen.append(batch.wavelen.squeeze() - output["wavelen"])
     def convert(self, delta: Union[torch.Tensor, List[torch.Tensor]]) -> np.ndarray:
     #    for t in delta:
     #        print(t.shape)
