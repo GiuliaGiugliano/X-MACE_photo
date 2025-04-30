@@ -1290,6 +1290,7 @@ class EmbeddingEMACE(torch.nn.Module):
             )
             node_feats_list.append(node_feats)
             node_output = readout(node_feats).squeeze(-1)
+            print(node_output.shape)
             node_energies = torch.transpose(node_output[:, :self.n_energies], 0, 1)
             node_oscillators = torch.transpose(node_output[:, self.n_energies: self.n_energies + self.n_oscillators], 0, 1)
             node_kisc = torch.transpose(node_output[:, self.n_energies + self.n_oscillators: self.n_energies + self.n_oscillators + self.n_kisc], 0, 1)

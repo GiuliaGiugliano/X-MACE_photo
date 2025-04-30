@@ -1,4 +1,4 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: mace-torch
 Version: 0.3.6
 Home-page: https://github.com/ACEsuit/mace
@@ -20,6 +20,7 @@ Requires-Dist: matplotlib
 Requires-Dist: pandas
 Provides-Extra: wandb
 Requires-Dist: wandb; extra == "wandb"
+Dynamic: license-file
 
 # X‑MACE
 

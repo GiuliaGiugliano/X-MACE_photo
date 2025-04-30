@@ -546,6 +546,8 @@ class MACELoss(Metric):
             print(batch.wavelen)
             self.delta_wavelen.append(batch.wavelen - output["wavelen"])
     def convert(self, delta: Union[torch.Tensor, List[torch.Tensor]]) -> np.ndarray:
+    #    for t in delta:
+    #        print(t.shape)
         if isinstance(delta, list):
             delta = torch.cat(delta)
         return to_numpy(delta)
