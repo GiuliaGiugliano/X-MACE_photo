@@ -43,6 +43,10 @@ python3 X-MACE_photo/scripts/run_train.py --train_file="full_system_excitation_e
 
 # Usage for test
 
+Before having the predictions convert the model in a cpu.model file
+
+python3 convert_model_to_cpu.py
+
 python3 plot_distribution_avarage_test_mae.py
 
 The script plot_distribution_avarage_test_mae.py makes the prediction on the test set dataset and plots the scatter plot "Reference vs Prediction" and the MAE computed on the test set
