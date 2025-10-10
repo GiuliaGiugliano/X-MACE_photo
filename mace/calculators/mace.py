@@ -84,6 +84,18 @@ class MACECalculator(Calculator):
                 "stress",
                 "dipole",
             ]
+        elif model_type == "EmbeddingEMACE":
+            self.implemented_properties = [
+                "energy",
+                "forces",
+                "dipoles",
+                "socs",
+                "nacs",
+                "oscillator",
+                "kisc",
+                "wavelen",
+                "hlgap",
+            ]
         elif model_type == "ExcitedEMACE":
             self.implemented_properties = [
                 "energy",
@@ -91,7 +103,7 @@ class MACECalculator(Calculator):
                 "dipoles",
                 "socs",
                 "nacs",
-                "oscillators",
+                "oscillator",
             ]
         else:
             raise ValueError(
@@ -132,9 +144,25 @@ class MACECalculator(Calculator):
                         "dipoles_var",
                         "nacs_var",
                         "socs_var",
-                        "oscillators_var",
+                        "oscillator_var",
                     ]
                 )
+            elif model_type == "EmbeddingEMACE":
+                self.implemented_properties.extend(
+                    [
+                        "energies",
+                        "energy_var",
+                        "forces_var",
+                        "dipoles_var",
+                        "nacs_var",
+                        "socs_var",
+                        "oscillator_var",
+                        "kisc_var",
+                        "hlgap_var",
+                        "wavelen_var",
+                    ]
+                )
+
         if compile_mode is not None:
             print(f"Torch compile is enabled with mode: {compile_mode}")
             self.models = [
@@ -217,17 +245,39 @@ class MACECalculator(Calculator):
             dipoles = torch.zeros(num_models, 3, device=self.device)
             socs = torch.zeros(num_models, 3, device=self.device)
             nacs = torch.zeros(num_models, 3, device=self.device)
-            # Adjust dimensions for oscillators as needed
-            oscillators = torch.zeros(num_models, self.n_energies, device=self.device)
+            # Adjust dimensions for oscillator as needed
+            oscillator = torch.zeros(num_models, self.n_energies, device=self.device)
             dict_of_tensors.update({
                 "energies": energies,
                 "forces": forces,
                 "dipoles": dipoles,
                 "socs": socs,
                 "nacs": nacs,
-                "oscillators": oscillators,
+                "oscillator": oscillator,
             })
         return dict_of_tensors
+        # --- New branch for EmbeddingEMACE ---
+        if model_type == "EmbeddingEMACE":
+            energies = torch.zeros(num_models, self.n_energies, device=self.device)
+            forces = torch.zeros(num_models, num_atoms, self.n_energies, 3, device=self.device)
+            dipoles = torch.zeros(num_models, 3, device=self.device)
+            socs = torch.zeros(num_models, 3, device=self.device)
+            nacs = torch.zeros(num_models, 3, device=self.device)
+            # Adjust dimensions for oscillator as needed
+            oscillator = torch.zeros(num_models, self.n_energies, device=self.device)
+            dict_of_tensors.update({
+                "energies": energies,
+                "forces": forces,
+                "dipoles": dipoles,
+                "socs": socs,
+                "nacs": nacs,
+                "oscillator": oscillator,
+                "kisc": kisc,
+                "wavelen": wavelen,
+                "hlgap": hlgap,
+            })
+        return dict_of_tensors
+
 
     def _atoms_to_batch(self, atoms):
         config = data.config_from_atoms(atoms, charges_key=self.charges_key)
@@ -260,148 +310,33 @@ class MACECalculator(Calculator):
         Calculator.calculate(self, atoms)
         batch_base = self._atoms_to_batch(atoms)
 
-        if self.model_type in ["MACE", "EnergyDipoleMACE"]:
-            batch = self._clone_batch(batch_base)
-            node_e0 = self.models[0].atomic_energies_fn(batch["node_attrs"])
-            compute_stress = not self.use_compile
-        else:
-            compute_stress = False
+        total_energies = []
 
-        ret_tensors = self._create_result_tensors(
-            self.model_type, self.num_models, len(atoms)
-        )
         for i, model in enumerate(self.models):
             batch = self._clone_batch(batch_base)
             out = model(
                 batch.to_dict(),
-                compute_stress=compute_stress,
-                training=self.use_compile,
+                compute_stress=False,
+                training=False,
             )
-            if self.model_type in ["MACE", "EnergyDipoleMACE"]:
-                ret_tensors["energies"] = out["energy"].detach()
-                ret_tensors["forces"] = out["forces"].detach()
-                ret_tensors["dipoles"] = out["dipoles"].detach()
-                ret_tensors["nacs"] = out["nacs"].detach()
-                ret_tensors["socs"] = out["socs"].detach()
-                if out["stress"] is not None:
-                    ret_tensors["stress"][i] = out["stress"].detach()
-            if self.model_type in ["DipoleMACE", "EnergyDipoleMACE"]:
-                ret_tensors["dipole"][i] = out["dipoles"].detach()
-            # --- New branch for ExcitedEMACE ---
-            if self.model_type == "ExcitedEMACE":
-                ret_tensors["energies"] = out["energy"].detach()
-                ret_tensors["forces"] = out["forces"].detach()
-                ret_tensors["dipoles"] = out["dipoles"].detach()
-                ret_tensors["nacs"] = out["nacs"].detach()
-                ret_tensors["socs"] = out["socs"].detach()
-                ret_tensors["oscillators"] = out["oscillators"].detach()
+            
+            total_energies.append(out["energy"].detach().cpu().numpy())
+            #ret_tensors["forces"] = out["forces"].detach()
+            #ret_tensors["dipoles"] = out["dipoles"].detach()
+            #ret_tensors["nacs"] = out["nacs"].detach()
+            #ret_tensors["socs"] = out["socs"].detach()
+            #ret_tensors["oscillator"] = out["oscillator"].detach()
+            #ret_tensors["kisc"] = out["kisc"].detach()
+            #ret_tensors["wavelen"] = out["wavelen"].detach()
+            #ret_tensors["hlgap"] = out["hlgap"].detach()
 
+        total_energies = np.stack(total_energies, axis=0)
+    
         self.results = {}
-        if self.model_type in ["MACE", "EnergyDipoleMACE"]:
-            self.results["energy"] = (
-                torch.mean(ret_tensors["energies"], dim=0).cpu().numpy()
-                * self.energy_units_to_eV
-            )
-            self.results["free_energy"] = self.results["energy"]
-            self.results["node_energy"] = (
-                torch.mean(ret_tensors["node_energy"], dim=0).cpu().numpy()
-            )
-            if self.num_models > 1:
-                self.results["energies"] = (
-                    ret_tensors["energies"].cpu().numpy() * self.energy_units_to_eV
-                )
-                self.results["energy_var"] = (
-                    torch.var(ret_tensors["energies"], dim=0, unbiased=False)
-                    .cpu()
-                    .item()
-                    * self.energy_units_to_eV
-                )
-                self.results["forces_comm"] = (
-                    ret_tensors["forces"].cpu().numpy()
-                    * self.energy_units_to_eV
-                    / self.length_units_to_A
-                )
-            if out.get("stress") is not None:
-                self.results["stress"] = full_3x3_to_voigt_6_stress(
-                    torch.mean(ret_tensors["stress"], dim=0).cpu().numpy()
-                    * self.energy_units_to_eV
-                    / self.length_units_to_A**3
-                )
-                if self.num_models > 1:
-                    self.results["stress_var"] = full_3x3_to_voigt_6_stress(
-                        torch.var(ret_tensors["stress"], dim=0, unbiased=False)
-                        .cpu()
-                        .numpy()
-                        * self.energy_units_to_eV
-                        / self.length_units_to_A**3
-                    )
-        elif self.model_type in ["DipoleMACE", "EnergyDipoleMACE"]:
-            self.results["dipole"] = (
-                torch.mean(ret_tensors["dipole"], dim=0).cpu().numpy()
-            )
-            if self.num_models > 1:
-                self.results["dipole_var"] = (
-                    torch.var(ret_tensors["dipole"], dim=0, unbiased=False)
-                    .cpu()
-                    .numpy()
-                )
-        # --- New aggregation branch for ExcitedEMACE ---
-        elif self.model_type == "ExcitedEMACE":
-            self.results["energy"] = (
-                torch.mean(ret_tensors["energies"], dim=0).cpu().numpy()
-                * self.energy_units_to_eV
-            )
-            self.results["forces"] = (
-                torch.mean(ret_tensors["forces"], dim=0).cpu().numpy()
-                * self.energy_units_to_eV
-                / self.length_units_to_A
-            )
-            self.results["dipoles"] = (
-                torch.mean(ret_tensors["dipoles"], dim=0).cpu().numpy()
-            )
-            self.results["nacs"] = (
-                torch.mean(ret_tensors["nacs"], dim=0).cpu().numpy()
-            )
-            self.results["socs"] = (
-                torch.mean(ret_tensors["socs"], dim=0).cpu().numpy()
-            )
-            self.results["oscillators"] = (
-                torch.mean(ret_tensors["oscillators"], dim=0).cpu().numpy()
-            )
-            if self.num_models > 1:
-                self.results["energy_var"] = (
-                    torch.var(ret_tensors["energies"], dim=0, unbiased=False)
-                    .cpu()
-                    .item()
-                    * self.energy_units_to_eV
-                )
-                self.results["forces_var"] = (
-                    torch.var(ret_tensors["forces"], dim=0, unbiased=False)
-                    .cpu()
-                    .numpy()
-                    * self.energy_units_to_eV
-                    / self.length_units_to_A
-                )
-                self.results["dipoles_var"] = (
-                    torch.var(ret_tensors["dipoles"], dim=0, unbiased=False)
-                    .cpu()
-                    .numpy()
-                )
-                self.results["nacs_var"] = (
-                    torch.var(ret_tensors["nacs"], dim=0, unbiased=False)
-                    .cpu()
-                    .numpy()
-                )
-                self.results["socs_var"] = (
-                    torch.var(ret_tensors["socs"], dim=0, unbiased=False)
-                    .cpu()
-                    .numpy()
-                )
-                self.results["oscillators_var"] = (
-                    torch.var(ret_tensors["oscillators"], dim=0, unbiased=False)
-                    .cpu()
-                    .numpy()
-                )
+        
+        self.results["energy"] = np.mean(total_energies, axis=0)
+        self.results["energy_var"] = np.var(np.mean(total_energies, axis=-1))
+
 
     def get_hessian(self, atoms=None):
         if atoms is None and self.atoms is None:

@@ -425,7 +425,7 @@ class WeightedEnergyForcesNacsDipoleLoss(torch.nn.Module):
     def forward(self, ref: Batch, pred: TensorDict) -> torch.Tensor:
         loss = 0
 
-        if ref["energy"] is not None and not torch.all(ref["energy"] == 0).item():
+        if ref["energy"] is not None :
             loss += self.energy_weight * mean_squared_error_energy(ref, pred)
 
         if ref["forces"] is not None and not torch.all(ref["forces"] == 0).item():
