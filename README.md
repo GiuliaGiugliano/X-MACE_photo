@@ -1,101 +1,68 @@
-# X‑MACE
+X-MACE represents an advanced deep learning framework specifically designed to accurately model excited-state potential energy surfaces, with a particular emphasis on regions near conical intersections. This framework builds upon the Message Passing Atomic Cluster Expansion (MACE) architecture by incorporating Deep Sets, allowing for the generation of smooth representations of inherently non-smooth energy landscapes. In this study, we introduce an adapted version of X-MACE aimed at the identification of novel potential photosensitizers for applications in photodynamic therapy. The model demonstrates the capability to predict UV-VIS spectra, intersystem crossing rates, HOMO-LUMO gaps, the energy difference between the ground and triplet states, which is critical for the type II mechanism, the energy difference between the ground state and the radical anion form of the molecule, as well as the energy differential between the triplet state and the cation form of the photosensitizer pertinent to the type I mechanism. This is achieved by inputting the ground state xyz structure along with the total molecular charge.
 
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)   
-[![Python Version](https://img.shields.io/badge/Python-3.7%2B-blue.svg)](https://www.python.org/downloads/)
-
-**X‑MACE** is a deep learning framework designed to model excited‐state potential energy surfaces with high accuracy, especially near conical intersections. It extends the Message Passing Atomic Cluster Expansion (MACE) architecture by integrating Deep Sets to learn smooth representations of inherently non‐smooth energy surfaces. An overview of the main parameters used in the MACE architecture can be found [here](https://github.com/ACEsuit/mace).
-
----
-
-## Overview
-
-X‑MACE provides researchers with a powerful tool to train models that predict excited-state properties. The framework is tailored to handle multiple energy levels, forces, non-adiabatic couplings (NACs), and dipole moments, making it ideal for studying systems where excited-state dynamics are crucial.
-
-Key features include:
-- **Multi-level Energy Learning:** Use the `--n_energies` parameter to specify how many energy levels the model should learn.
-- **Error Analysis:** Generate error tables for energies, forces, NACs, and dipole moments with the `--error_table` option and the associated table `EnergyNacsDipoleMAE`
-- **Transfer Learning Capability:** Leverage pre-trained ground state representations by specifying the `--foundation_model` parameter.
-
----
-
-## Documentation
-
-Detailed documentation is in progress. In the meantime, usage examples provided below should help you get started. For more information on MACE-related parameters, please refer to the [MACE repository](https://github.com/ACEsuit/mace).
-
----
-
-## System Requirements
-
-### Hardware
-- A standard computer with enough RAM for deep learning computations however a GPU enabled machine is strongly recommended. 
-
-### Software
-- **Operating System:** Linux, macOS, or Windows (best used with a conda environment)
-- **Python:** 3.7 or higher
-- **Dependencies:** X‑MACE relies on the typical deep learning and scientific computing stack in Python. All dependencies are installed during installation of the library 
-
----
-
-## Installation
+# Installation
 
 Ensure that Python 3.7+ is installed in your environment. To install X‑MACE and its dependencies clone the github repo and install locally. The installation should only take a few minutes on a normal computer. The following commands illustate this:
 
-```bash
-git clone https://github.com/your-repo/x-mace.git
-cd x-mace
-pip install .
-```
-It is also highly recommended to create a python environment beforehand, This can be done using the following commands:
+git clone https://github.com/GiuliaGiugliano/X-MACE_photo.git
 
-```bash
+cd x-mace
+
+pip install .
+
+The installation can be made also on a python environment
+
 # Clone the repository
-git clone https://github.com/your-repo/x-mace.git
+
+git clone https://github.com/GiuliaGiugliano/X-MACE_photo.git
+
 cd x-mace
 
 # Create and activate a new Python virtual environment using conda
-conda create --name x-mace-env python=3.8 -y
+
+conda create --name x-mace_photo-env python=3.8 -y
+
 conda activate x-mace-env
 
 # Install dependencies and X‑MACE
+
 pip install .
-``` 
 
----
+# Usage for classification
 
-## Usage
+python3 classification.py
 
-The following commands allow training of the machine learning models mentioned in the paper with and without the autoencoder and with and without transfer learning. Output files containing the loss and validation errors can be seen in the results folder. Run time will depend on the size of the architecture as well as the number of GPUs available but normally will take less than 1 day. The following commands can be replaced with the relevant datasets and number of energy levels.  
+For oscillator strength values training before X-MACE regression, an XGBoost classification model is used to discriminate molecules with an oscillator strength > 0.03. On the resulted molecules X-MACE regression is applied
 
-### Training the X‑MACE Model (with Autoencoder)
+# Usage for training 
 
-```bash
-python3 scripts/run_train.py --name="model1" --train_file="singlet_chromophores.xyz" --seed=100 --valid_fraction=0.1 --E0s='average' --model="AutoencoderExcitedMACE" --r_max=5.0 --batch_size=100 --n_energies=5 --correlation=3 --max_num_epochs=100 --ema --lr=0.0001 --ema_decay=0.99 --default_dtype="float32" --device=cuda --hidden_irreps="128x0e + 128x1o" --MLP_irreps='128x0e' --num_radial_basis=8 --num_interactions=2 --energy_weight=100.0 --error_table="EnergyNacsDipoleMAE"
-```
+python3 X-MACE_photo/scripts/run_train.py --train_file="full_system_excitation_energy_train.xyz" --name="model" --seed=100 --valid_fraction=0.1 --E0s='average' --model="EmbeddingEMACE" --r_max=5.0 --batch_size=5 --correlation=3 --max_num_epochs=350 --ema --lr=0.001 --ema_decay=0.99 --default_dtype="float32" --device=cuda --hidden_irreps="256x0e + 256x1o" --MLP_irreps='256x0e' --num_radial_basis=8 --num_interactions=2 --energy_weight=100 --kisc_weight=0 --oscillator_weight=0 --wavelen_weight=0 --hlgap_weight=0 --error_table="EnergyNacsDipoleMAE"  --scalar_key="REF_scalar" --n_nacs=0 --n_dipoles=0 --n_socs=0 --n_oscillator=0 --n_energies=5 --n_wavelen=0 --n_kisc=0 --n_hlgap=0
 
-### Training the E‑MACE Model (without Autoencoder)
 
-```bash
-python3 scripts/run_train.py --name="model1" --train_file="singlet_chromophores.xyz" --seed=100 --valid_fraction=0.1 --E0s='average' --model="ExcitedMACE" --r_max=5.0 --batch_size=100 --n_energies=5 --correlation=3 --max_num_epochs=100 --ema --lr=0.0001 --ema_decay=0.99 --default_dtype="float32" --device=cuda --hidden_irreps="128x0e + 128x1o" --MLP_irreps='128x0e' --num_radial_basis=8 --num_interactions=2 --energy_weight=100.0 --error_table="EnergyNacsDipoleMAE"
-```
+--train_file is followed by the the corrisponding property file in the ase xyz format. For each property the hyperparamers used are in the paper: "Machine learning-driven discovery of novel photosensitizer for cancer therapy"
 
-### Transfer Learning
+# Usage for test
 
-```bash
-python3 scripts/run_train.py --name="model1" --train_file="singlet_chromophores.xyz" --seed=100 --valid_fraction=0.1 --foundation_model="medium_off" --E0s='average' --model="ExcitedMACE" --r_max=5.0 --batch_size=100 --n_energies=5 --correlation=3 --max_num_epochs=100 --ema --lr=0.0001 --ema_decay=0.99 --default_dtype="float32" --device=cuda --hidden_irreps="128x0e + 128x1o" --MLP_irreps='128x0e' --num_radial_basis=8 --num_interactions=2 --energy_weight=100.0 --error_table="EnergyNacsDipoleMAE"
-```
+python3 plot_distribution_avarage_test_mae.py
 
----
+The script plot_distribution_avarage_test_mae.py makes the prediction on the test set dataset and plots the scatter plot "Reference vs Prediction" and the MAE computed on the test set
 
-## Datasets
+# Usage for virtual screening classification (oscillator strength)
 
-The datasets used for developing and benchmarking X‑MACE are available from publications references in the X-MACE publication. You can also access some of them directly via this link:  
-[Datasets for X‑MACE Publication](https://figshare.com/articles/dataset/Datasets_for_X-MACE_Publication/28425173).
+python3 xgboost_predict_new.py
 
----
+The scripts takes the trained classification model and classifies molecules with oscillator strengths lower and higher than 0.03
 
-## License
+# Usage for virtual screening X-MACE predictions
 
-This project is licensed under the MIT License
+python3 predict.py 
 
----
+The script predict.py makes the predictions of a certain photophysical property by putting the virtual screening dataset in the ase xyz format. It has to contains the xyz geometry of the ground state and the total charge of the molecule. I t prints the results in a csv file
+
+# Dataset
+
+All the training, test, virtual screening datasets and scripts are available via the following link:
+
+https://doi.org/10.6084/m9.figshare.30329572
+
 
