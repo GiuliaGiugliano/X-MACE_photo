@@ -66,7 +66,6 @@ The script predict.py makes the predictions of a certain photophysical property 
 # Dataset
 
 All the training, test, virtual screening datasets and scripts are available via the following link:
-
-https://doi.org/10.6084/m9.figshare.30329572
+https://github.com/GiuliaGiugliano/X-MACE_photo_data.git
 
 
