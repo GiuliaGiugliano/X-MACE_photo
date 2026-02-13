@@ -16,13 +16,13 @@ The installation can be made also on a python environment
 
 git clone https://github.com/GiuliaGiugliano/X-MACE_photo.git
 
-cd x-mace
+cd X-MACE_photo
 
 # Create and activate a new Python virtual environment using conda
 
 conda create --name x-mace_photo-env python=3.8 -y
 
-conda activate x-mace-env
+conda activate x-mace_photo-env
 
 # Install dependencies and X‑MACE
 
