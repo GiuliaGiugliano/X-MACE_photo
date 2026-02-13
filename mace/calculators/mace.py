@@ -311,6 +311,7 @@ class MACECalculator(Calculator):
         batch_base = self._atoms_to_batch(atoms)
 
         total_energies = []
+        total_forces = []
 
         for i, model in enumerate(self.models):
             batch = self._clone_batch(batch_base)
@@ -319,23 +320,18 @@ class MACECalculator(Calculator):
                 compute_stress=False,
                 training=False,
             )
-            
+
             total_energies.append(out["energy"].detach().cpu().numpy())
-            #ret_tensors["forces"] = out["forces"].detach()
-            #ret_tensors["dipoles"] = out["dipoles"].detach()
-            #ret_tensors["nacs"] = out["nacs"].detach()
-            #ret_tensors["socs"] = out["socs"].detach()
-            #ret_tensors["oscillator"] = out["oscillator"].detach()
-            #ret_tensors["kisc"] = out["kisc"].detach()
-            #ret_tensors["wavelen"] = out["wavelen"].detach()
-            #ret_tensors["hlgap"] = out["hlgap"].detach()
+            total_forces.append(out["forces"].detach().cpu().numpy())
 
         total_energies = np.stack(total_energies, axis=0)
-    
+        total_forces = np.stack(total_forces, axis=0)
+
         self.results = {}
-        
         self.results["energy"] = np.mean(total_energies, axis=0)
         self.results["energy_var"] = np.var(np.mean(total_energies, axis=-1))
+        self.results["forces"] = np.mean(total_forces, axis=0)
+
 
 
     def get_hessian(self, atoms=None):
