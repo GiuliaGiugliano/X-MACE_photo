@@ -41,7 +41,6 @@ scripts/         Training entry point and workflow scripts
   plot_distribution_avarage_test_mae.py
   xgboost_predict_new.py
   predict.py
-tests/           Unit tests (`pytest tests`)
 ```
 
 Training runs write `logs/`, `checkpoints/` and `results/` into the current working
@@ -85,7 +84,6 @@ To run the test suite:
 
 ```bash
 pip install ".[dev]"
-pytest tests
 ```
 
 ---
