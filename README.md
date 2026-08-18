@@ -100,11 +100,19 @@ molecules with oscillator strength > 0.03. X‑MACE regression is then applied o
 the molecules that pass.
 
 ```bash
-python3 scripts/classification.py
+python3 scripts/classification.py \
+  --train ../X-MACE_photo_data/training_set_dataset_file/full_system_oscillator_first_excitation_train.xyz \
+  --test  ../X-MACE_photo_data/test_set_dataset_file/full_system_oscillator_first_excitation_test.xyz \
+  --outdir classifier_assets \
+  --device cpu
 ```
 
-This writes the trained classifier artefacts (`model.json`, `scaler.pkl`,
-`species.json`) into the working directory.
+This writes the trained classifier assets (`model.json`, `scaler.pkl`,
+`species.json`) plus diagnostic plots into `--outdir`. Use `--device cuda` on a GPU.
+
+> **Note.** The classifier needs both classes (oscillator strength above and below
+> 0.03). The published oscillator dataset contains only molecules above the
+> threshold, so it cannot be used to retrain the classifier as-is.
 
 ### 2. X‑MACE regression training
 
@@ -152,13 +160,27 @@ python3 scripts/convert_model_to_cpu.py --input model.model --output model_cpu.m
 Then evaluate and plot:
 
 ```bash
-python3 scripts/plot_distribution_avarage_test_mae.py
+python3 scripts/plot_distribution_avarage_test_mae.py \
+  --xyz ../X-MACE_photo_data/test_set_dataset_file/full_system_delta_s0_t1_test.xyz \
+  --model model_cpu.model \
+  --n-energies 5 \
+  --outdir results_test
 ```
 
-This predicts on the test set in
-`../X-MACE_photo_data/test_set_dataset_file/`, plots the reference-vs-prediction
-scatter, and reports the MAE. The equivalent script for the training set is
-`plot_distribution_avarage_train_mae.py`.
+This predicts on the test set, plots the reference-vs-prediction scatter, and
+reports the MAE. `--n-energies` must match the `--n_energies` used at training time.
+
+The equivalent script for the training set additionally needs the validation index
+file and the metrics file written by the training run:
+
+```bash
+python3 scripts/plot_distribution_avarage_train_mae.py \
+  --xyz ../X-MACE_photo_data/training_set_dataset_file/full_system_delta_s0_t1_train.xyz \
+  --model model_cpu.model \
+  --valid-indices valid_indices.txt \
+  --metrics results/model_train.txt \
+  --n-energies 5
+```
 
 ### 4. Virtual screening
 
@@ -166,17 +188,28 @@ First classify by oscillator strength, then predict the remaining properties.
 
 ```bash
 # Keep molecules with oscillator strength > 0.03
-python3 scripts/xgboost_predict_new.py --input molecule.xyz
+python3 scripts/xgboost_predict_new.py \
+  --input molecule.xyz \
+  --assets classifier_assets
 
 # Predict photophysical properties for the retained molecules
-python3 scripts/predict.py
+python3 scripts/predict.py \
+  --xyz ../X-MACE_photo_data/virtual_screening_dataset/virtual_screening_dataset.xyz \
+  --model model_cpu.model \
+  --n-energies 5 \
+  --out predictions.csv
 ```
 
-`xgboost_predict_new.py` loads the classifier artefacts produced in stage 1 from the
-working directory. `predict.py` reads its input dataset and model path from the
-`CONFIG` block at the top of the file — set `XYZ_FILE` to
-`../X-MACE_photo_data/virtual_screening_dataset/virtual_screening_dataset.xyz` and
-`MODEL_FILES` to your converted CPU model. Results are written to `predictions.csv`.
+`xgboost_predict_new.py` loads the classifier assets produced in stage 1 from
+`--assets`. It checks that the SOAP descriptor length matches the trained scaler and
+fails with a clear message if the two disagree.
+
+`predict.py` writes one row per structure to `--out`, with the mean predicted energy
+for each of the `--n-energies` states.
+
+The selection thresholds reported in the paper (λmax > 400 nm, oscillator strength
+> 0.03, HOMO-LUMO gap 1.5-3.5 eV, ΔE(T1-S0) > 0.88 eV, redox gaps > 3.5 eV) are
+applied to these outputs; they are not currently implemented as a script.
 
 ---
 
