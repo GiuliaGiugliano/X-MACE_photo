@@ -4,14 +4,27 @@ import pandas as pd
 from ase.io import read
 from mace.calculators import MACECalculator
 
-# ——— CONFIG —————————————————————————————————————————————————————
-XYZ_FILE    = "virtual_screening_dataset.xyz" #put your dataset 
-MODEL_FILES = ["file.model"] # put the cpu model file
-DEVICE      = "cuda"            # oppure "cpu"
-MODEL_TYPE  = "EmbeddingEMACE"
-N_ENG       = 5                   # numero di energie da predire (≥2)
-OUT_CSV     = "predictions.csv"
-# ————————————————————————————————————————————————————————————————
+import argparse
+
+ap = argparse.ArgumentParser(
+    description="Predict photophysical properties for a screening dataset with a trained X-MACE model.")
+ap.add_argument("--xyz", required=True,
+                help="Dataset, ASE .xyz with ground-state geometry and total charge")
+ap.add_argument("--model", required=True, nargs="+",
+                help="One or more trained models (.model). Run convert_model_to_cpu.py first for --device cpu")
+ap.add_argument("--device", default="cpu", choices=["cpu", "cuda"], help="default: cpu")
+ap.add_argument("--model-type", default="EmbeddingEMACE")
+ap.add_argument("--n-energies", type=int, default=5,
+                help="Must match --n_energies used at training time (default: 5)")
+ap.add_argument("--out", default="predictions.csv", help="Output CSV (default: predictions.csv)")
+args = ap.parse_args()
+
+XYZ_FILE    = args.xyz
+MODEL_FILES = args.model
+DEVICE      = args.device
+MODEL_TYPE  = args.model_type
+N_ENG       = args.n_energies
+OUT_CSV     = args.out
 
 # 1) Calculator
 calculator = MACECalculator(
@@ -23,16 +36,16 @@ calculator = MACECalculator(
 )
 
 # 2) Load structure
-structures = list(read(XYZ_FILE, ":"))  # legge tutti i frame
+structures = list(read(XYZ_FILE, ":"))  # read all frames
 
 results = []
 for idx, mol in enumerate(structures):
     frame_number = idx + 1
-    # calcola l'energia per ognuno dei N_ENG run
+    # energy for each of the N_ENG runs
     calculator.calculate(mol, properties=["energy"])
     energies = np.array(calculator.results["energy"])  # shape (n_samples, N_ENG)
 
-    # avarage on each run
+    # average over runs
     mean_energies = energies.mean(axis=0)  # shape (N_ENG,)
 
     # take "source" if present
@@ -51,4 +64,4 @@ df = pd.DataFrame(results, columns=cols)
 df.to_csv(OUT_CSV, index=False)
 
 print(f"Predictions saved in '{OUT_CSV}' ({len(df)} lines).")
-print(f"Col: {cols}")
+print(f"Columns: {cols}")
