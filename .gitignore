@@ -1,0 +1,41 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+env/
+venv/
+.venv/
+ENV/
+
+# ---- Packaging / build artifacts ----
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# ---- Editor / OS junk ----
+.*.sw[a-p]
+*.swp
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+
+# ---- Test / lint caches ----
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Training run outputs ----
+logs/
+checkpoints/
+results/
+*.model
+*.pt
+wandb/

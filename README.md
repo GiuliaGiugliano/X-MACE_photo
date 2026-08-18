@@ -1,71 +1,201 @@
-X-MACE represents an advanced deep learning framework specifically designed to accurately model excited-state potential energy surfaces, with a particular emphasis on regions near conical intersections. This framework builds upon the Message Passing Atomic Cluster Expansion (MACE) architecture by incorporating Deep Sets, allowing for the generation of smooth representations of inherently non-smooth energy landscapes. In this study, we introduce an adapted version of X-MACE aimed at the identification of novel potential photosensitizers for applications in photodynamic therapy. The model demonstrates the capability to predict UV-VIS spectra, intersystem crossing rates, HOMO-LUMO gaps, the energy difference between the ground and triplet states, which is critical for the type II mechanism, the energy difference between the ground state and the radical anion form of the molecule, as well as the energy differential between the triplet state and the cation form of the photosensitizer pertinent to the type I mechanism. This is achieved by inputting the ground state xyz structure along with the total molecular charge.
+# X‑MACE for photosensitiser discovery
 
-# Installation
+X‑MACE is a deep learning framework for modelling excited-state potential energy
+surfaces, with particular emphasis on regions near conical intersections. It builds on
+the Message Passing Atomic Cluster Expansion (MACE) architecture by incorporating Deep
+Sets, allowing smooth representations of inherently non-smooth energy landscapes.
 
-Ensure that Python 3.7+ is installed in your environment. To install X‑MACE and its dependencies clone the github repo and install locally. The installation should only take a few minutes on a normal computer. The following commands illustate this:
+This repository contains an adapted version of X‑MACE aimed at identifying novel
+photosensitisers for photodynamic therapy. From a ground-state XYZ structure plus the
+total molecular charge, the model predicts:
 
+- UV-VIS spectra and first-excitation oscillator strength
+- Intersystem crossing rates (log k<sub>ISC</sub>)
+- HOMO–LUMO gaps
+- S<sub>0</sub>–T<sub>1</sub> energy differences (relevant to the type II mechanism)
+- S<sub>0</sub>–radical anion and T<sub>1</sub>–cation energy differences (type I mechanism)
+- Transition dipole moments
+
+---
+
+## Repository organisation
+
+The project is split across **two** repositories. All *code* lives here; only the
+*datasets* live in the data repository, because they are too large (~294 MB) to be
+practical in the code repository.
+
+| Repository | Contents |
+|---|---|
+| [`X-MACE_photo`](https://github.com/GiuliaGiugliano/X-MACE_photo) (this repo) | X‑MACE source package, training entry point, and all analysis/prediction scripts |
+| [`X-MACE_photo_data`](https://github.com/GiuliaGiugliano/X-MACE_photo_data) | Training, test and virtual-screening datasets in ASE `.xyz` format |
+
+Layout of this repository:
+
+```text
+mace/            X-MACE source package (installed by `pip install .`)
+scripts/         Training entry point and workflow scripts
+  run_train.py
+  classification.py
+  convert_model_to_cpu.py
+  plot_distribution_avarage_train_mae.py
+  plot_distribution_avarage_test_mae.py
+  xgboost_predict_new.py
+  predict.py
+tests/           Unit tests (`pytest tests`)
+```
+
+Training runs write `logs/`, `checkpoints/` and `results/` into the current working
+directory. These are generated at run time and are not tracked in git.
+
+> **Note on paths.** Every command below is run from the **root of this repository**
+> unless stated otherwise. Dataset paths are written as
+> `../X-MACE_photo_data/...`, which assumes the two repositories are cloned
+> side by side. Adjust the paths if you clone them elsewhere.
+
+---
+
+## Installation
+
+Requires Python 3.7+ (3.8 recommended). Installation takes a few minutes on a normal
+computer. A GPU is strongly recommended for training.
+
+```bash
+# Clone both repositories side by side
 git clone https://github.com/GiuliaGiugliano/X-MACE_photo.git
-
-cd x-mace
-
-pip install .
-
-The installation can be made also on a python environment
-
-# Clone the repository
-
-git clone https://github.com/GiuliaGiugliano/X-MACE_photo.git
+git clone https://github.com/GiuliaGiugliano/X-MACE_photo_data.git
 
 cd X-MACE_photo
 
-# Create and activate a new Python virtual environment using conda
-
+# Create and activate an environment
 conda create --name x-mace_photo-env python=3.8 -y
-
 conda activate x-mace_photo-env
 
-# Install dependencies and X‑MACE
-
+# Install X-MACE and its dependencies
 pip install .
+```
 
-# Usage for classification
+The classification and virtual-screening steps need a few extra packages. Install them
+with the `screening` extra:
 
-python3 classification.py
+```bash
+pip install ".[screening]"
+```
 
-For oscillator strength values training before X-MACE regression, an XGBoost classification model is used to discriminate molecules with an oscillator strength > 0.03. On the resulted molecules X-MACE regression is applied
+To run the test suite:
 
-# Usage for training 
+```bash
+pip install ".[dev]"
+pytest tests
+```
 
-python3 X-MACE_photo/scripts/run_train.py --train_file="full_system_excitation_energy_train.xyz" --name="model" --seed=100 --valid_fraction=0.1 --E0s='average' --model="EmbeddingEMACE" --r_max=5.0 --batch_size=5 --correlation=3 --max_num_epochs=350 --ema --lr=0.001 --ema_decay=0.99 --default_dtype="float32" --device=cuda --hidden_irreps="256x0e + 256x1o" --MLP_irreps='256x0e' --num_radial_basis=8 --num_interactions=2 --energy_weight=100 --kisc_weight=0 --oscillator_weight=0 --wavelen_weight=0 --hlgap_weight=0 --error_table="EnergyNacsDipoleMAE"  --scalar_key="REF_scalar" --n_nacs=0 --n_dipoles=0 --n_socs=0 --n_oscillator=0 --n_energies=5 --n_wavelen=0 --n_kisc=0 --n_hlgap=0
+---
 
+## Workflow
 
---train_file is followed by the the corrisponding property file in the ase xyz format. For each property the hyperparamers used are in the paper: "Machine learning-driven discovery of novel photosensitizer for cancer therapy"
+The full pipeline has four stages. Stages 1 and 2 are training; stages 3 and 4 are
+prediction on new molecules.
 
-# Usage for test
+### 1. Oscillator-strength classification (XGBoost)
 
-Before having the predictions convert the model in a cpu.model file
+Before X‑MACE regression on oscillator strengths, an XGBoost classifier discriminates
+molecules with oscillator strength > 0.03. X‑MACE regression is then applied only to
+the molecules that pass.
 
-python3 convert_model_to_cpu.py
+```bash
+python3 scripts/classification.py
+```
 
-python3 plot_distribution_avarage_test_mae.py
+This writes the trained classifier artefacts (`model.json`, `scaler.pkl`,
+`species.json`) into the working directory.
 
-The script plot_distribution_avarage_test_mae.py makes the prediction on the test set dataset and plots the scatter plot "Reference vs Prediction" and the MAE computed on the test set
+### 2. X‑MACE regression training
 
-# Usage for virtual screening classification (oscillator strength)
+```bash
+python3 scripts/run_train.py \
+  --train_file="../X-MACE_photo_data/training_set_dataset_file/full_system_excitation_energy_train.xyz" \
+  --name="model" --seed=100 --valid_fraction=0.1 --E0s='average' \
+  --model="EmbeddingEMACE" --r_max=5.0 --batch_size=5 --correlation=3 \
+  --max_num_epochs=350 --ema --lr=0.001 --ema_decay=0.99 \
+  --default_dtype="float32" --device=cuda \
+  --hidden_irreps="256x0e + 256x1o" --MLP_irreps='256x0e' \
+  --num_radial_basis=8 --num_interactions=2 \
+  --energy_weight=100 --kisc_weight=0 --oscillator_weight=0 \
+  --wavelen_weight=0 --hlgap_weight=0 \
+  --error_table="EnergyNacsDipoleMAE" --scalar_key="REF_scalar" \
+  --n_nacs=0 --n_dipoles=0 --n_socs=0 --n_oscillator=0 \
+  --n_energies=5 --n_wavelen=0 --n_kisc=0 --n_hlgap=0
+```
 
-python3 xgboost_predict_new.py
+Pass the training file for the property you want to model. Available property files are
+in `../X-MACE_photo_data/training_set_dataset_file/`:
 
-The scripts takes the trained classification model and classifies molecules with oscillator strengths lower and higher than 0.03
+| Property | Training file |
+|---|---|
+| Excitation energy | `full_system_excitation_energy_train.xyz` |
+| HOMO–LUMO gap | `full_system_hlgap_train.xyz` |
+| log k<sub>ISC</sub> | `full_system_logkisc_train.xyz` |
+| Transition dipole | `full_system_transition_dipole_train.xyz` |
+| ΔE(S<sub>0</sub>–T<sub>1</sub>) | `full_system_delta_s0_t1_train.xyz` |
+| ΔE(S<sub>0</sub>–anion) | `full_system_delta_s0_an_train.xyz` |
+| ΔE(cation–T<sub>1</sub>) | `full_system_delta_cat_t1_train.xyz` |
+| Oscillator strength | `full_system_oscillator_first_excitation_train.xyz` |
 
-# Usage for virtual screening X-MACE predictions
+The hyperparameters used for each property are given in the paper, *"Machine
+learning-driven discovery of novel photosensitizer for cancer therapy"*.
 
-python3 predict.py 
+### 3. Evaluation on the test set
 
-The script predict.py makes the predictions of a certain photophysical property by putting the virtual screening dataset in the ase xyz format. It has to contains the xyz geometry of the ground state and the total charge of the molecule. I t prints the results in a csv file
+Models are saved with CUDA tensors, so convert to CPU first:
 
-# Dataset
+```bash
+python3 scripts/convert_model_to_cpu.py --input model.model --output model_cpu.model
+```
 
-All the training, test, virtual screening datasets and scripts are available via the following link:
-https://github.com/GiuliaGiugliano/X-MACE_photo_data.git
+Then evaluate and plot:
 
+```bash
+python3 scripts/plot_distribution_avarage_test_mae.py
+```
 
+This predicts on the test set in
+`../X-MACE_photo_data/test_set_dataset_file/`, plots the reference-vs-prediction
+scatter, and reports the MAE. The equivalent script for the training set is
+`plot_distribution_avarage_train_mae.py`.
+
+### 4. Virtual screening
+
+First classify by oscillator strength, then predict the remaining properties.
+
+```bash
+# Keep molecules with oscillator strength > 0.03
+python3 scripts/xgboost_predict_new.py --input molecule.xyz
+
+# Predict photophysical properties for the retained molecules
+python3 scripts/predict.py
+```
+
+`xgboost_predict_new.py` loads the classifier artefacts produced in stage 1 from the
+working directory. `predict.py` reads its input dataset and model path from the
+`CONFIG` block at the top of the file — set `XYZ_FILE` to
+`../X-MACE_photo_data/virtual_screening_dataset/virtual_screening_dataset.xyz` and
+`MODEL_FILES` to your converted CPU model. Results are written to `predictions.csv`.
+
+---
+
+## Datasets
+
+Datasets are in the companion repository,
+[`X-MACE_photo_data`](https://github.com/GiuliaGiugliano/X-MACE_photo_data):
+
+- `training_set_dataset_file/` — training sets, one `.xyz` per property. Each molecule
+  carries its charge, the reference property in the `REF_energy` array, and the
+  ground-state XYZ coordinates.
+- `test_set_dataset_file/` — test sets, same format.
+- `virtual_screening_dataset/` — molecules from the ATC dataset used for screening,
+  with charge and ground-state geometry.
+
+---
+
+## License
+
+This project is licensed under the MIT License.
