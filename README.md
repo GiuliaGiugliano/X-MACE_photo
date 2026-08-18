@@ -74,16 +74,10 @@ pip install .
 ```
 
 The classification and virtual-screening steps need a few extra packages. Install them
-with the `screening` extra:
+with:
 
 ```bash
-pip install ".[screening]"
-```
-
-To run the test suite:
-
-```bash
-pip install ".[dev]"
+pip install .
 ```
 
 ---
