@@ -28,6 +28,15 @@ N_SEARCH   = 50          # random configurations to try
 EARLY_STOP = 30           # round without improving
 # -------------------------------------------------------------------- #
 
+def xgb_base_params(device: str) -> dict:
+    """Base XGBoost parameters.
+
+    `gpu_id` / `predictor` were removed in XGBoost 3.1; `device` replaces both.
+    """
+    return dict(objective="multi:softprob", num_class=NUM_CLASS,
+                tree_method="hist", device=device, seed=RSEED)
+
+
 def osc_class(v: float) -> int:
     return 0 if v <= BINS[1] else 1
 
@@ -77,13 +86,12 @@ def random_cfg():
         "n_estimators"    : random.choice([300, 400, 500]),
     }
 
-def evaluate_cfg(cfg, X, y):
+def evaluate_cfg(cfg, X, y, device):
     kf = KFold(CV_FOLDS, shuffle=True, random_state=RSEED)
     f1s = []
     for tr, val in kf.split(X, y):
         dtr, dval = xgb.DMatrix(X[tr], label=y[tr]), xgb.DMatrix(X[val], label=y[val])
-        p = dict(objective="multi:softprob", num_class=NUM_CLASS, tree_method="hist",
-                 predictor="gpu_predictor", gpu_id=0, seed=RSEED,
+        p = dict(**xgb_base_params(device),
                  **{k:v for k,v in cfg.items() if k!="n_estimators"})
         bst = xgb.train(p, dtr, cfg["n_estimators"], obj=weighted_obj,
                         evals=[(dval,"val")], verbose_eval=False, early_stopping_rounds=EARLY_STOP)
@@ -92,7 +100,8 @@ def evaluate_cfg(cfg, X, y):
     return np.mean(f1s)
 
 # ----------------------------- MAIN ----------------------------- #
-def main(train_xyz: Path, test_xyz: Path):
+def main(train_xyz: Path, test_xyz: Path, outdir: Path, device: str):
+    outdir.mkdir(parents=True, exist_ok=True)
     random.seed(RSEED); np.random.seed(RSEED)
 
     species = detect_species([train_xyz, test_xyz])
@@ -107,25 +116,24 @@ def main(train_xyz: Path, test_xyz: Path):
 
     # --------- random search ---------
     best_f1, best_cfg = -1, None
-    print(f"🔍 Random search su {N_SEARCH} configurazioni...")
+    print(f"Random search over {N_SEARCH} configurations...")
     for i in range(1, N_SEARCH+1):
         cfg = random_cfg()
-        f1  = evaluate_cfg(cfg, X_tr, y_tr)
+        f1  = evaluate_cfg(cfg, X_tr, y_tr, device)
         if f1 > best_f1:
             best_f1, best_cfg = f1, cfg
         print(f"[{i:03}/{N_SEARCH}] F1 = {f1:.4f} | cfg = {cfg}")
-    print(f"\n★ Migliore: {best_cfg}  (macro-F1 = {best_f1:.4f})")
+    print(f"\nBest configuration: {best_cfg}  (macro-F1 = {best_f1:.4f})")
 
-    # --------- training finale ---------
+    # --------- final training ---------
     dtrain, dtest = xgb.DMatrix(X_tr, label=y_tr), xgb.DMatrix(X_te, label=y_te)
-    params = dict(objective="multi:softprob", num_class=NUM_CLASS, tree_method="hist",
-                  predictor="gpu_predictor", gpu_id=0, seed=RSEED,
+    params = dict(**xgb_base_params(device),
                   **{k:v for k,v in best_cfg.items() if k!="n_estimators"})
 
-    print("\n🏃 Training finale...")
+    print("\nFinal training...")
     bst = xgb.train(params, dtrain, best_cfg["n_estimators"], obj=weighted_obj,
                     evals=[(dtrain,"train")], verbose_eval=False)
-    print("✓ completato.\n")
+    print("Done.\n")
 
     # ------------------- REPORT & PLOT ------------------- #
     y_prob = bst.predict(dtest)[:,1]
@@ -134,14 +142,14 @@ def main(train_xyz: Path, test_xyz: Path):
     # report
     rep = classification_report(y_te, y_pred, digits=4)
     print("=== Classification Report (test) ===\n", rep)
-    Path("classification_report.txt").write_text(rep)
+    (outdir / "classification_report.txt").write_text(rep)
 
     # Confusion Matrix
     ConfusionMatrixDisplay.from_predictions(
         y_te, y_pred, display_labels=["f ≤ 0.03","f > 0.03"],
         cmap="Greens", colorbar=False)
     plt.title("Confusion Matrix"); plt.tight_layout()
-    plt.savefig("confusion_matrix.png", dpi=1200); plt.close()
+    plt.savefig(outdir / "confusion_matrix.png", dpi=1200); plt.close()
 
     # ROC
     fpr, tpr, _ = roc_curve(y_te, y_prob)
@@ -149,14 +157,14 @@ def main(train_xyz: Path, test_xyz: Path):
     plt.figure(); plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.3f}")
     plt.plot([0,1],[0,1],"--"); plt.xlabel("FPR"); plt.ylabel("TPR")
     plt.title("ROC Curve"); plt.legend(); plt.tight_layout()
-    plt.savefig("roc_curve.png", dpi=1200); plt.close()
+    plt.savefig(outdir / "roc_curve.png", dpi=1200); plt.close()
 
     # Precision-Recall
     prec, rec, _ = precision_recall_curve(y_te, y_prob)
     ap = average_precision_score(y_te, y_prob)
     plt.figure(); plt.plot(rec, prec, label=f"AP = {ap:.3f}")
     plt.xlabel("Recall"); plt.ylabel("Precision"); plt.title("Precision-Recall")
-    plt.legend(); plt.tight_layout(); plt.savefig("precision_recall_curve.png", dpi=1200); plt.close()
+    plt.legend(); plt.tight_layout(); plt.savefig(outdir / "precision_recall_curve.png", dpi=1200); plt.close()
 
     # Learning curve (logloss)
     evals = {}
@@ -167,19 +175,23 @@ def main(train_xyz: Path, test_xyz: Path):
     rounds  = range(1, len(tr_loss)+1)
     plt.figure(); plt.plot(rounds, tr_loss, label="Train"); plt.plot(rounds, te_loss, label="Test")
     plt.xlabel("Round"); plt.ylabel("Log Loss"); plt.title("Learning Curve")
-    plt.legend(); plt.tight_layout(); plt.savefig("learning_curve.png", dpi=1200); plt.close()
+    plt.legend(); plt.tight_layout(); plt.savefig(outdir / "learning_curve.png", dpi=1200); plt.close()
 
     # ------------------- SAVE ASSETS ------------------- #
-    bst.save_model("model.json")
-    joblib.dump(scaler, "scaler.pkl")
-    with open("species.json","w") as f:
+    bst.save_model(str(outdir / "model.json"))
+    joblib.dump(scaler, outdir / "scaler.pkl")
+    with open(outdir / "species.json","w") as f:
         json.dump(species, f)
-    print("✓ modello, scaler, species e grafici salvati.")
+    print(f"Saved model, scaler, species and plots to {outdir}/")
 
 # ------------------ CLI ------------------ #
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--train", required=True, help="File XYZ di train")
-    ap.add_argument("--test",  required=True, help="File XYZ di test")
+    ap.add_argument("--train", required=True, help="Training set, ASE .xyz")
+    ap.add_argument("--test",  required=True, help="Test set, ASE .xyz")
+    ap.add_argument("--outdir", default=".",
+                    help="Directory for model.json, scaler.pkl, species.json and plots")
+    ap.add_argument("--device", default="cpu", choices=["cpu", "cuda"],
+                    help="XGBoost device (default: cpu)")
     args = ap.parse_args()
-    main(Path(args.train), Path(args.test))
+    main(Path(args.train), Path(args.test), Path(args.outdir), args.device)
