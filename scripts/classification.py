@@ -19,7 +19,7 @@ import xgboost as xgb
 import joblib
 
 # -------------------------- PARAMETERS -------------------------- #
-SOAP_PAR   = dict(r_cut=5.0, n_max=12, l_max=8, sigma=0.3, periodic=False)
+SOAP_PAR   = dict(r_cut=5.0, n_max=8, l_max=6, sigma=0.3, periodic=False)
 NUM_CLASS  = 2
 CV_FOLDS   = 7
 RSEED      = 42
