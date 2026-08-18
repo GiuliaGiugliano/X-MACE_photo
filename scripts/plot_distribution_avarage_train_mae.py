@@ -10,18 +10,36 @@ import numpy as np
 from ase.io import read
 from mace.calculators import MACECalculator
 
-# ——— CONFIG —————————————————————————————————————————————————————
-XYZ_FILE     = "full_system_delta_s0_t1_train.xyz" #put the training set dataset 
-MODEL_FILE   = "file.model"  #put the file.model from the training phase 
-DEVICE       = "cuda"            # or "cpu"
-MODEL_TYPE   = "EmbeddingEMACE"
-N_ENG        = 2
-VALID_IDX_F  = "valid_indices_300.txt"
-METRICS_FILE = "results/file_train.txt"   # in the results directory there is a file_train.txt where read the MAE
-# ————————————————————————————————————————————————————————————————
+import argparse
+
+ap = argparse.ArgumentParser(
+    description="Evaluate a trained X-MACE model on the training/validation split.")
+ap.add_argument("--xyz", required=True,
+                help="Training set, ASE .xyz (e.g. ../X-MACE_photo_data/training_set_dataset_file/"
+                     "full_system_delta_s0_t1_train.xyz)")
+ap.add_argument("--model", required=True, help="Trained model (.model)")
+ap.add_argument("--valid-indices", required=True,
+                help="Text file of validation indices, one per line, as written by the training run")
+ap.add_argument("--metrics", required=True,
+                help="Training metrics file, e.g. results/<name>_train.txt (mae_e is read from the last line)")
+ap.add_argument("--device", default="cpu", choices=["cpu", "cuda"], help="default: cpu")
+ap.add_argument("--model-type", default="EmbeddingEMACE")
+ap.add_argument("--n-energies", type=int, default=5,
+                help="Must match --n_energies used at training time (default: 5)")
+ap.add_argument("--outdir", default=".", help="Where to write train_scatter.png")
+args = ap.parse_args()
+
+XYZ_FILE     = args.xyz
+MODEL_FILE   = args.model
+DEVICE       = args.device
+MODEL_TYPE   = args.model_type
+N_ENG        = args.n_energies
+VALID_IDX_F  = args.valid_indices
+METRICS_FILE = args.metrics
+OUTDIR       = Path(args.outdir); OUTDIR.mkdir(parents=True, exist_ok=True)
 
 def load_mae(path: str | Path) -> float:
-    """Givefloat associated to  'mae_e' in the last line of the file."""
+    """Return the float associated with 'mae_e' on the last line of the file."""
     path = Path(path)
     with path.open("r", encoding="utf-8") as fh:
         last = fh.readlines()[-1]
@@ -58,7 +76,7 @@ for idx, mol in enumerate(db):
 
     raw = mol.info.get("REF_energy")
     if raw is None:
-        raise KeyError(f"[{idx}] REF_energy mancante")
+        raise KeyError(f"[{idx}] REF_energy missing")
     ref_arr = np.array(json.loads(raw) if isinstance(raw, str) else raw).ravel()
 
     if e_pred.shape != ref_arr.shape:
@@ -78,7 +96,7 @@ avg_ref_train  = np.array(avg_ref_train)
 avg_pred_val   = np.array(avg_pred_val)
 avg_ref_val    = np.array(avg_ref_val)
 
-print(f"✅ Train: {len(avg_pred_train)} molecule, Validation: {len(avg_pred_val)} molecule")
+print(f"Train: {len(avg_pred_train)} molecules, Validation: {len(avg_pred_val)} molecules")
 
 # ---------- MAE from metrics file ------------------------------------------
 mae_val = load_mae(METRICS_FILE)
@@ -105,6 +123,6 @@ plt.gca().set_aspect("equal", adjustable="box")
 plt.legend(fontsize=18, markerscale=1.5)
 
 plt.tight_layout()
-plt.savefig("train_scatter.png", dpi=1200)
-plt.show()
+plt.savefig(OUTDIR / "train_scatter.png", dpi=1200)
+plt.close()
 print("✓ Save: train_scatter.png")
