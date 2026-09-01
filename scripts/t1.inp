@@ -1,0 +1,3 @@
+! b3lyp_g  def2-tzvp  CPCM(water) OPT
+%PAL NPROCS 16 END
+* xyzfile   0   3   xtbopt.xyz
